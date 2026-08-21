@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Xml;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\Exception\CodecException;
 use Smithy\Codec\AbstractCodec;
 use Smithy\Core\Serde\Schema;
@@ -48,20 +49,20 @@ final class XmlCodec extends AbstractCodec
     /**
      * Create an XML deserializer.
      *
-     * @param string       $source XML text to parse.
+     * @param StreamInterface $source XML text to parse.
      * @param list<string> $extraWrapperElements Additional wrapper element
      *                                           names to descend into for
      *                                           this call.
      */
     public function createDeserializer(
-        string $source,
+        StreamInterface $source,
         array $extraWrapperElements = []
     ): ShapeDeserializerInterface
     {
         $useInternalErrors = \libxml_use_internal_errors(true);
         try {
             $xml = new \SimpleXMLElement(
-                $source,
+                $source->getContents(),
                 LIBXML_NOBLANKS | LIBXML_NONET | LIBXML_COMPACT
             );
         } catch (\Exception $e) {

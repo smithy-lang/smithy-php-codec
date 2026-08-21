@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Json;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\AbstractCodec;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
@@ -34,7 +35,7 @@ final class JsonCodec extends AbstractCodec
     /**
      * Create a JSON deserializer.
      */
-    public function createDeserializer(string $source): ShapeDeserializerInterface
+    public function createDeserializer(StreamInterface $source): ShapeDeserializerInterface
     {
         return new JsonDeserializer($source, $this->settings);
     }

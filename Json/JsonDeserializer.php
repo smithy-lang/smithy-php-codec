@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Json;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\Exception\DeserializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableShapeInterface;
@@ -29,18 +30,19 @@ final class JsonDeserializer implements ShapeDeserializerInterface
     private mixed $parsed;
 
     public function __construct(
-        string $source,
+        StreamInterface $source,
         ?JsonCodecSettings $settings = null
     )
     {
         $this->settings = $settings ?? new JsonCodecSettings();
         $this->honorTimestampFormatTrait =
             $this->settings->honorTimestampFormatTrait;
-        if ($source === '') {
-            $this->parsed = null;
-            return;
-        }
-        $decoded = \json_decode($source, true, 512, \JSON_BIGINT_AS_STRING);
+        $decoded = \json_decode(
+            $source->getContents(),
+            true,
+            512,
+            \JSON_BIGINT_AS_STRING
+        );
         if ($decoded === null && \json_last_error() !== \JSON_ERROR_NONE) {
             throw new DeserializationException(
                 'JSON deserialization failed: ' . \json_last_error_msg()

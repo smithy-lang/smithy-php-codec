@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Cbor;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\Exception\DeserializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableShapeInterface;
@@ -68,16 +69,17 @@ final class CborDeserializer implements ShapeDeserializerInterface
     private int $depth = 0;
 
     /**
-     * @param string $source Encoded CBOR payload.
+     * @param StreamInterface $source Encoded CBOR payload.
      * @param CborCodecSettings|null $settings Codec behavior overrides.
      */
     public function __construct(
-        string $source,
+        StreamInterface $source,
         ?CborCodecSettings $settings = null
     )
     {
-        $this->payload = $source;
-        $this->length = \strlen($source);
+        $length = $source->getSize();
+        $this->payload = $source->getContents();
+        $this->length = $length ?? \strlen($this->payload);
         $this->settings = $settings ?? new CborCodecSettings();
         $this->honorTimestampFormatTrait =
             $this->settings->honorTimestampFormatTrait;
@@ -92,10 +94,6 @@ final class CborDeserializer implements ShapeDeserializerInterface
      */
     public function deserialize(Schema $schema, array &$members): void
     {
-        if ($this->length === 0) {
-            return;
-        }
-
         if ($schema->type === ShapeType::Union->value) {
             static $unionExtKey = null;
             $unionExtKey ??= CborSchemaExtensionProvider::key();

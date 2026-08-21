@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
@@ -45,9 +46,9 @@ abstract class AbstractCodec
     /**
      * Create a deserializer for this codec's format.
      *
-     * @param string $source Serialized bytes to deserialize from.
-     *
      * @return ShapeDeserializerInterface Fresh deserializer bound to `$source`.
      */
-    abstract public function createDeserializer(string $source): ShapeDeserializerInterface;
+    abstract public function createDeserializer(
+        StreamInterface $source
+    ): ShapeDeserializerInterface;
 }

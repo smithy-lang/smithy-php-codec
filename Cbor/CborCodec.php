@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Cbor;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\AbstractCodec;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
@@ -37,7 +38,7 @@ final class CborCodec extends AbstractCodec
     /**
      * Create a CBOR deserializer.
      */
-    public function createDeserializer(string $source): ShapeDeserializerInterface
+    public function createDeserializer(StreamInterface $source): ShapeDeserializerInterface
     {
         return new CborDeserializer($source, $this->settings);
     }
