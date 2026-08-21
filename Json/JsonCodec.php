@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Json;
 
-use Smithy\Core\Serde\AbstractCodec;
+use Smithy\Codec\AbstractCodec;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;

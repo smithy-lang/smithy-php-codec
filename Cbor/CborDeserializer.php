@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Cbor;
 
+use Smithy\Codec\Exception\DeserializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableShapeInterface;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
-use Smithy\Core\Serde\ShapeType;
+use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\TimestampFormat;
 use Smithy\Core\Shape\BigDecimal;
 use Smithy\Core\Shape\BigInteger;
@@ -989,7 +990,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
                 return $this->readMap($schema);
 
             case ShapeType::Document->value:
-                throw new \LogicException(
+                throw new DeserializationException(
                     'rpcv2-cbor does not support'
                     . ' Smithy document shapes.'
                 );
@@ -1694,7 +1695,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
      */
     private function malformed(): never
     {
-        throw new \RuntimeException('Malformed CBOR payload.');
+        throw new DeserializationException('Malformed CBOR payload.');
     }
 
     /**

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Cbor;
 
+use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableStructInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
-use Smithy\Core\Serde\ShapeType;
+use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\TimestampFormat;
 use Smithy\Core\Shape\BigDecimal;
 use Smithy\Core\Shape\BigInteger;
@@ -623,7 +624,7 @@ final class CborSerializer implements ShapeSerializerInterface
             return;
         }
 
-        throw new \LogicException(
+        throw new SerializationException(
             'rpcv2-cbor does not support Smithy document shapes.'
         );
     }
@@ -1050,7 +1051,7 @@ final class CborSerializer implements ShapeSerializerInterface
 
             case ShapeType::Structure->value:
                 if (!$value instanceof SerializableStructInterface) {
-                    throw new \InvalidArgumentException(
+                    throw new SerializationException(
                         'Expected SerializableStructInterface for structure'
                         . ' value.'
                     );
@@ -1080,12 +1081,12 @@ final class CborSerializer implements ShapeSerializerInterface
                 return;
 
             case ShapeType::Document->value:
-                throw new \LogicException(
+                throw new SerializationException(
                     'rpcv2-cbor does not support Smithy document shapes.'
                 );
         }
 
-        throw new \InvalidArgumentException(
+        throw new SerializationException(
             'Unsupported CBOR shape type: ' . $schema->type
         );
     }
@@ -1255,7 +1256,7 @@ final class CborSerializer implements ShapeSerializerInterface
                         continue;
                     }
                     if (!$item instanceof SerializableStructInterface) {
-                        throw new \InvalidArgumentException(
+                        throw new SerializationException(
                             'Expected SerializableStructInterface for '
                             . 'structure value.'
                         );
@@ -1504,7 +1505,7 @@ final class CborSerializer implements ShapeSerializerInterface
                         continue;
                     }
                     if (!$value instanceof SerializableStructInterface) {
-                        throw new \InvalidArgumentException(
+                        throw new SerializationException(
                             'Expected SerializableStructInterface for '
                             . 'structure value.'
                         );
@@ -1633,7 +1634,7 @@ final class CborSerializer implements ShapeSerializerInterface
         $entry = null;
 
         if (!($union instanceof UnionInterface) && !\is_array($union)) {
-            throw new \InvalidArgumentException(
+            throw new SerializationException(
                 'Expected UnionInterface or array for union value.'
             );
         }
@@ -1680,7 +1681,7 @@ final class CborSerializer implements ShapeSerializerInterface
             $entry = $info?->unionEncodeByMemberName[$tag] ?? null;
             $variantSchema = $entry[2] ?? $resolvedSchema?->getMember($tag);
             if ($resolvedSchema !== null && $variantSchema === null) {
-                throw new \InvalidArgumentException(
+                throw new SerializationException(
                     'Unknown union variant: ' . $tag
                 );
             }
@@ -1753,7 +1754,7 @@ final class CborSerializer implements ShapeSerializerInterface
 
                 case ShapeType::Structure->value:
                     if (!$value instanceof SerializableStructInterface) {
-                        throw new \InvalidArgumentException(
+                        throw new SerializationException(
                             'Expected SerializableStructInterface for '
                             . 'structure value.'
                         );

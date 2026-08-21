@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Json;
 
+use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableStructInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
-use Smithy\Core\Serde\ShapeType;
+use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\TimestampFormat;
 use Smithy\Core\Shape\BigDecimal;
 use Smithy\Core\Shape\BigInteger;
@@ -428,7 +429,7 @@ final class JsonSerializer implements ShapeSerializerInterface
             \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE
         );
         if ($encoded === false) {
-            throw new \RuntimeException(
+            throw new SerializationException(
                 'JSON serialization failed: ' . \json_last_error_msg()
             );
         }
@@ -443,7 +444,7 @@ final class JsonSerializer implements ShapeSerializerInterface
                 $encoded
             );
             if ($encoded === null) {
-                throw new \RuntimeException(
+                throw new SerializationException(
                     'JSON serialization failed while unwrapping big numbers.'
                 );
             }

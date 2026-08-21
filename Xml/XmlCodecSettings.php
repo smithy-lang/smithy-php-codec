@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Xml;
 
-use Smithy\Core\Serde\AbstractCodecSettings;
+use Smithy\Codec\AbstractCodecSettings;
 use Smithy\Core\Serde\TimestampFormat;
 
 /**

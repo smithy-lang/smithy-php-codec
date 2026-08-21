@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Xml;
 
+use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
-use Smithy\Core\Serde\ShapeType;
+use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\SerializableStructInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
 use Smithy\Core\Serde\TimestampFormat;
@@ -604,7 +605,7 @@ final class XmlSerializer implements ShapeSerializerInterface
      *
      * @return void
      *
-     * @throws \LogicException When XML serialization reaches a document member.
+     * @throws SerializationException When XML serialization reaches a document member.
      */
     public function serializeDocument(
         Schema $schema,
@@ -613,7 +614,7 @@ final class XmlSerializer implements ShapeSerializerInterface
     ): void
     {
         // Smithy XML protocols have no wire representation for document members.
-        throw new \LogicException(\sprintf(
+        throw new SerializationException(\sprintf(
             'XML protocols do not support document-typed members; '
             . 'member "%s" of shape "%s" cannot be serialized.',
             $schema->memberName ?? '(unnamed)',

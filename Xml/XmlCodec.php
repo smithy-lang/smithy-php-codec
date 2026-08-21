@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Xml;
 
-use Smithy\Core\Serde\AbstractCodec;
+use Smithy\Codec\Exception\CodecException;
+use Smithy\Codec\AbstractCodec;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
@@ -64,7 +65,7 @@ final class XmlCodec extends AbstractCodec
                 LIBXML_NOBLANKS | LIBXML_NONET | LIBXML_COMPACT
             );
         } catch (\Exception $e) {
-            throw new \RuntimeException(
+            throw new CodecException(
                 'Failed to parse XML: ' . $e->getMessage(),
                 0,
                 $e

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\FormUrlEncoded;
 
+use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableStructInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
-use Smithy\Core\Serde\ShapeType;
+use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\TimestampFormat;
 use Smithy\Core\Shape\BigDecimal;
 use Smithy\Core\Shape\BigInteger;
@@ -393,12 +394,12 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
      *
      * @return void
      *
-     * @throws \RuntimeException
+     * @throws SerializationException
      */
     public function serializeMap(Schema $schema, array $map, int $idx): void
     {
         if (!$this->settings->supportsMaps) {
-            throw new \RuntimeException(
+            throw new SerializationException(
                 'This form-urlencoded mode does not support map '
                 . 'serialization (member: '
                 . ($schema->memberName ?? $schema->id) . ')'
@@ -700,14 +701,14 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
      *
      * @return void
      *
-     * @throws \RuntimeException
+     * @throws SerializationException
      */
     public function serializeDocument(
         Schema $schema,
         ?DocumentInterface $value,
         int $idx
     ): void {
-        throw new \RuntimeException(
+        throw new SerializationException(
             'This form-urlencoded mode does not support document '
             . 'types (member: '
             . ($schema->memberName ?? $schema->id) . ')'
@@ -1074,7 +1075,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                 return;
         }
 
-        throw new \LogicException(
+        throw new SerializationException(
             'serializeValue does not support ShapeType ' . $type
         );
     }

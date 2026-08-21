@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\FormUrlEncoded;
 
-use Smithy\Core\Serde\AbstractCodec;
+use Smithy\Codec\Exception\CodecException;
+use Smithy\Codec\AbstractCodec;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
 
@@ -41,11 +42,11 @@ final class FormUrlEncodedCodec extends AbstractCodec
     /**
      * Reject deserializer creation.
      *
-     * @throws \LogicException
+     * @throws CodecException
      */
     public function createDeserializer(string $source): ShapeDeserializerInterface
     {
-        throw new \LogicException(
+        throw new CodecException(
             'FormUrlEncodedCodec does not support deserialization. '
             . 'awsQuery responses are XML. Route them through XmlCodec instead.'
         );

@@ -106,7 +106,7 @@ final class FormUrlEncodedSchemaExtension
         public readonly bool $flattened = false,
 
         /**
-         * Pre-resolved list member {@see \Smithy\Core\Serde\ShapeType}
+         * Pre-resolved list member {@see \Smithy\Core\Shape\ShapeType}
          * as its `int` value (mirroring {@see Schema::$type}) for
          * list-typed schemas. Saves a `getListMember()?->type` chain on
          * every list write and keeps the serializer's type-dispatch

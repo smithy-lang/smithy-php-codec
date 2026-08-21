@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Json;
 
+use Smithy\Codec\Exception\DeserializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableShapeInterface;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
-use Smithy\Core\Serde\ShapeType;
+use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\TimestampFormat;
 use Smithy\Core\Shape\BigDecimal;
 use Smithy\Core\Shape\BigInteger;
@@ -41,7 +42,7 @@ final class JsonDeserializer implements ShapeDeserializerInterface
         }
         $decoded = \json_decode($source, true, 512, \JSON_BIGINT_AS_STRING);
         if ($decoded === null && \json_last_error() !== \JSON_ERROR_NONE) {
-            throw new \RuntimeException(
+            throw new DeserializationException(
                 'JSON deserialization failed: ' . \json_last_error_msg()
             );
         }
