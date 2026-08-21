@@ -76,14 +76,9 @@ final class JsonSchemaExtensionProvider
         $rawOrderedMembers = [];
         $timestampFormats = [];
 
-        $metadataSchema = $schema;
-        if (
-            $schema->type === ShapeType::Union->value
-            && $schema->getMemberCount() === 0
-            && $schema->hasTarget()
-        ) {
-            $metadataSchema = $schema->resolveTarget();
-        }
+        $metadataSchema = $schema->type === ShapeType::Union->value
+            ? $schema->resolveTarget()
+            : $schema;
 
         foreach ($metadataSchema->getMembers() as $member) {
             $idx = $member->memberIndex;

@@ -191,14 +191,9 @@ final class CborSchemaExtensionProvider
         $unionEncodeByMemberName = [];
         $unionEncodeByMemberIndex = [];
 
-        $metadataSchema = $schema;
-        if (
-            $schema->type === ShapeType::Union->value
-            && $schema->getMemberCount() === 0
-            && $schema->hasTarget()
-        ) {
-            $metadataSchema = $schema->resolveTarget();
-        }
+        $metadataSchema = $schema->type === ShapeType::Union->value
+            ? $schema->resolveTarget()
+            : $schema;
 
         $membersByIndex = $metadataSchema->getMembersByIndex();
         if ($membersByIndex !== []) {
