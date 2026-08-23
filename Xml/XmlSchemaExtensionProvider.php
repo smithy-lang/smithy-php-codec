@@ -355,10 +355,7 @@ final class XmlSchemaExtensionProvider
             $schema->isMember()
             && $schema->hasTrait(Schema::T_HTTP_PAYLOAD)
         ) {
-            $pos = \strpos($schema->id, '#');
-            $structXmlName = $pos !== false
-                ? \substr($schema->id, $pos + 1)
-                : ($schema->memberName ?? '');
+            $structXmlName = self::resolvePayloadRootName($schema);
         } else {
             $structXmlName = $schema->memberName ?? '';
             if ($structXmlName === '' && $schema->id !== '') {
@@ -466,6 +463,24 @@ final class XmlSchemaExtensionProvider
             listMemberTimestampFormat: $listTsFmt,
             listMemberExtension: $listMemberExtension
         );
+    }
+
+    /**
+     * Resolve the root element name for an aggregate `@httpPayload`.
+     */
+    private static function resolvePayloadRootName(Schema $schema): string
+    {
+        $target = $schema->resolveTarget();
+        $xmlName = $target->getTrait(Schema::T_XML_NAME);
+        if (\is_string($xmlName) && $xmlName !== '') {
+            return $xmlName;
+        }
+
+        $pos = \strpos($target->id, '#');
+
+        return $pos !== false
+            ? \substr($target->id, $pos + 1)
+            : $target->id;
     }
 
     /** Normalize `@xmlNamespace` into `['uri' => ..., 'prefix' => ...]`. */
