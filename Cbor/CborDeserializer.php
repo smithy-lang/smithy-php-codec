@@ -94,6 +94,9 @@ final class CborDeserializer implements ShapeDeserializerInterface
      */
     public function deserialize(Schema $schema, array &$members): void
     {
+        $this->idx = 0;
+        $this->depth = 0;
+
         if ($schema->type === ShapeType::Union->value) {
             static $unionExtKey = null;
             $unionExtKey ??= CborSchemaExtensionProvider::key();
