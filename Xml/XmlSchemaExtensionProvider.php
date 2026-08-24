@@ -54,7 +54,7 @@ final class XmlSchemaExtensionProvider
         $nsTrait = $schema->getTrait(Schema::T_XML_NAMESPACE);
         if ($nsTrait !== null) {
             return new XmlSchemaExtension(
-                xmlName: $schema->getTrait(Schema::T_XML_NAME) ?? '',
+                xmlName: self::getXmlNameTrait($schema) ?? '',
                 xmlNamespace: self::resolveNamespace($nsTrait)
             );
         }
@@ -72,7 +72,7 @@ final class XmlSchemaExtensionProvider
             ?? $resolvedTarget?->targetClass;
         $resolvedTargetSchema = $resolvedTarget;
 
-        $explicitXmlName = $schema->getTrait(Schema::T_XML_NAME);
+        $explicitXmlName = self::getXmlNameTrait($schema);
         if ($explicitXmlName !== null) {
             $xmlName = $explicitXmlName;
         } elseif (
@@ -103,11 +103,11 @@ final class XmlSchemaExtensionProvider
         );
 
         if ($schema->type === ShapeType::List_->value) {
-            $listMember = $schema->getListMember();
+            $listMember = $resolvedTarget->getListMember();
             $flattened = $schema->hasTrait(Schema::T_XML_FLATTENED);
             $listMemberName = $flattened
                 ? $xmlName
-                : ($listMember?->getTrait(Schema::T_XML_NAME) ?? 'member');
+                : (self::getXmlNameTrait($listMember) ?? 'member');
 
             $listTsFmt = null;
             if ($listMember !== null
@@ -141,8 +141,8 @@ final class XmlSchemaExtensionProvider
         }
 
         if ($schema->type === ShapeType::Map->value) {
-            $mapKey = $schema->getMapKey();
-            $mapValue = $schema->getMapValue();
+            $mapKey = $resolvedTarget->getMapKey();
+            $mapValue = $resolvedTarget->getMapValue();
             $flattened = $schema->hasTrait(Schema::T_XML_FLATTENED);
 
             $mapValueTsFmt = null;
@@ -150,7 +150,7 @@ final class XmlSchemaExtensionProvider
                 && $mapValue->type === ShapeType::Timestamp->value
             ) {
                 $mapValueTsFmt = TimestampFormat::fromTraitString(
-                    $mapValue->getTrait(Schema::T_TIMESTAMP_FORMAT),
+                    $mapValue->getTrait(Schema::T_TIMESTAMP_FORMAT)
                 );
             }
             $mapValueExtension = $mapValue !== null
@@ -161,8 +161,8 @@ final class XmlSchemaExtensionProvider
                 xmlName: $xmlName,
                 xmlNamespace: $xmlNamespace,
                 isAttribute: $isAttribute,
-                mapKeyName: $mapKey?->getTrait(Schema::T_XML_NAME) ?? 'key',
-                mapValueName: $mapValue?->getTrait(Schema::T_XML_NAME)
+                mapKeyName: self::getXmlNameTrait($mapKey) ?? 'key',
+                mapValueName: self::getXmlNameTrait($mapValue)
                     ?? 'value',
                 mapEntryName: $flattened ? $xmlName : 'entry',
                 flattened: $flattened,
@@ -213,7 +213,7 @@ final class XmlSchemaExtensionProvider
 
         foreach ($schema->getMembers() as $memberSchema) {
             $idx = $memberSchema->memberIndex;
-            $xmlName = $memberSchema->getTrait(Schema::T_XML_NAME)
+            $xmlName = self::getXmlNameTrait($memberSchema)
                 ?? $memberSchema->memberName;
             $memberWireNames[$idx] = $xmlName;
 
@@ -233,7 +233,7 @@ final class XmlSchemaExtensionProvider
                         '&' => '&amp;',
                         '"' => '&quot;',
                         '<' => '&lt;',
-                        '>' => '&gt;',
+                        '>' => '&gt;'
                     ]);
                     $nsAttrs[$idx] = [
                         $attrName,
@@ -266,20 +266,20 @@ final class XmlSchemaExtensionProvider
                         $xmlName,
                         $idx,
                         12,
-                        $resolvedTimestampFormat,
+                        $resolvedTimestampFormat
                     ];
                 } else {
                     $attributeDeserMembers[] = [
                         $xmlName,
                         $idx,
-                        $memberSchema->type,
+                        $memberSchema->type
                     ];
                 }
             } elseif (
                 $memberSchema->type === ShapeType::List_->value
                 && $memberSchema->hasTrait(Schema::T_XML_FLATTENED)
             ) {
-                $flatName = $memberSchema->getTrait(Schema::T_XML_NAME)
+                $flatName = self::getXmlNameTrait($memberSchema)
                     ?? $memberSchema->memberName;
                 $listMember = $memberSchema->getListMember();
                 $flattenedLists[$flatName] = [
@@ -290,18 +290,18 @@ final class XmlSchemaExtensionProvider
                     2,
                     $memberSchema->memberIndex,
                     $memberSchema,
-                    $listMember,
+                    $listMember
                 ];
             } elseif (
                 $memberSchema->type === ShapeType::Map->value
                 && $memberSchema->hasTrait(Schema::T_XML_FLATTENED)
             ) {
-                $flatName = $memberSchema->getTrait(Schema::T_XML_NAME)
+                $flatName = self::getXmlNameTrait($memberSchema)
                     ?? $memberSchema->memberName;
                 $mapKey = $memberSchema->getMapKey();
                 $mapValue = $memberSchema->getMapValue();
-                $keyName = $mapKey?->getTrait(Schema::T_XML_NAME) ?? 'key';
-                $valueName = $mapValue?->getTrait(Schema::T_XML_NAME)
+                $keyName = self::getXmlNameTrait($mapKey) ?? 'key';
+                $valueName = self::getXmlNameTrait($mapValue)
                     ?? 'value';
                 $flattenedMaps[$flatName] = [
                     'member' => $memberSchema,
@@ -315,7 +315,7 @@ final class XmlSchemaExtensionProvider
                     $memberSchema,
                     $keyName,
                     $valueName,
-                    $mapValue,
+                    $mapValue
                 ];
             } else {
                 $elementMembers[$xmlName] = $memberSchema;
@@ -329,14 +329,14 @@ final class XmlSchemaExtensionProvider
                         $idx,
                         $memberSchema,
                         ShapeType::Timestamp->value,
-                        $resolvedTimestampFormat,
+                        $resolvedTimestampFormat
                     ];
                 } else {
                     $childMembers[$xmlName] = [
                         0,
                         $idx,
                         $memberSchema,
-                        $memberSchema->type,
+                        $memberSchema->type
                     ];
                 }
             }
@@ -348,7 +348,7 @@ final class XmlSchemaExtensionProvider
             }
         }
 
-        $explicitXmlName = $schema->getTrait(Schema::T_XML_NAME);
+        $explicitXmlName = self::getXmlNameTrait($schema);
         if ($explicitXmlName !== null) {
             $structXmlName = $explicitXmlName;
         } elseif (
@@ -419,7 +419,7 @@ final class XmlSchemaExtensionProvider
     private function buildListInfo(Schema $schema): XmlSchemaExtension
     {
         $listMember = $schema->getListMember();
-        $explicitXmlName = $schema->getTrait(Schema::T_XML_NAME);
+        $explicitXmlName = self::getXmlNameTrait($schema);
         if ($explicitXmlName !== null) {
             $xmlName = $explicitXmlName;
         } elseif ($schema->memberName !== null) {
@@ -433,7 +433,7 @@ final class XmlSchemaExtensionProvider
         $flattened = $schema->hasTrait(Schema::T_XML_FLATTENED);
         $memberName = $flattened
             ? $xmlName
-            : ($listMember?->getTrait(Schema::T_XML_NAME) ?? 'member');
+            : (self::getXmlNameTrait($listMember) ?? 'member');
         $xmlNamespace = self::resolveNamespace(
             $schema->getTrait(Schema::T_XML_NAMESPACE)
         );
@@ -463,6 +463,26 @@ final class XmlSchemaExtensionProvider
             listMemberTimestampFormat: $listTsFmt,
             listMemberExtension: $listMemberExtension
         );
+    }
+
+    /**
+     * Resolve `@xmlName` at the current serialization boundary.
+     *
+     * Runtime member schemas retain target traits for model inspection, but a
+     * target shape's root XML name does not rename a member element. Generated
+     * schemas already contain only the traits relevant to that boundary.
+     */
+    private static function getXmlNameTrait(?Schema $schema): ?string
+    {
+        if ($schema === null) {
+            return null;
+        }
+
+        $value = $schema->isMember() && $schema->target !== null
+            ? $schema->getDirectTrait(Schema::T_XML_NAME)
+            : $schema->getTrait(Schema::T_XML_NAME);
+
+        return \is_string($value) ? $value : null;
     }
 
     /**
@@ -513,7 +533,7 @@ final class XmlSchemaExtensionProvider
             && $mapValue->type === ShapeType::Timestamp->value
         ) {
             $mapValueTsFmt = TimestampFormat::fromTraitString(
-                $mapValue->getTrait(Schema::T_TIMESTAMP_FORMAT),
+                $mapValue->getTrait(Schema::T_TIMESTAMP_FORMAT)
             );
         }
         $mapValueExtension = $mapValue !== null
@@ -521,10 +541,10 @@ final class XmlSchemaExtensionProvider
             : null;
 
         return new XmlSchemaExtension(
-            mapKeyName: $mapKey?->getTrait(Schema::T_XML_NAME) ?? 'key',
-            mapValueName: $mapValue?->getTrait(Schema::T_XML_NAME) ?? 'value',
+            mapKeyName: self::getXmlNameTrait($mapKey) ?? 'key',
+            mapValueName: self::getXmlNameTrait($mapValue) ?? 'value',
             mapEntryName: $flattened
-                ? ($schema->getTrait(Schema::T_XML_NAME) ?? $schema->memberName)
+                ? (self::getXmlNameTrait($schema) ?? $schema->memberName)
                 : 'entry',
             flattened: $flattened,
             mapValueSchema: $mapValue,

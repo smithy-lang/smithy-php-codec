@@ -94,6 +94,9 @@ final class CborDeserializer implements ShapeDeserializerInterface
      */
     public function deserialize(Schema $schema, array &$members): void
     {
+        $this->idx = 0;
+        $this->depth = 0;
+
         if ($schema->type === ShapeType::Union->value) {
             static $unionExtKey = null;
             $unionExtKey ??= CborSchemaExtensionProvider::key();
@@ -533,8 +536,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
                                 $stringInfo
                             );
                         }
-                        if (
-                            $entry[2] === ShapeType::Enum->value
+                        if ($entry[2] === ShapeType::Enum->value
                             && $entry[4] !== null
                         ) {
                             $value = $entry[4]::fromValue($value);
@@ -561,8 +563,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
                             $numericInitial >> 5,
                             $numericInitial & 0x1F
                         );
-                        if (
-                            $entry[2] === ShapeType::IntEnum->value
+                        if ($entry[2] === ShapeType::IntEnum->value
                             && $entry[4] !== null
                         ) {
                             $value = $entry[4]::fromValue($value);
@@ -944,7 +945,9 @@ final class CborDeserializer implements ShapeDeserializerInterface
                         : null
                     ) ?? $this->settings->defaultTimestampFormat;
 
-                    return $format->parse($this->readStringFromInitial($initial));
+                    return $format->parse(
+                        $this->readStringFromInitial($initial)
+                    );
                 }
 
                 return match ($major) {
