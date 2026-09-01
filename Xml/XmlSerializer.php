@@ -562,8 +562,7 @@ final class XmlSerializer implements ShapeSerializerInterface
         $memberIndex = $union->getMemberIndex();
 
         $iterInfo = $info;
-        if (
-            $info->unionMembersByIndex === []
+        if ($info->unionMembersByIndex === []
             && $union instanceof UnionInterface
         ) {
             $iterInfo = $union->getSchema()->getExtension($extKey);

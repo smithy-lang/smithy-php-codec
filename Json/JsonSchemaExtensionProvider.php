@@ -46,15 +46,13 @@ final class JsonSchemaExtensionProvider
             return $this->buildTimestampInfo($schema);
         }
 
-        if (
-            $schema->type === ShapeType::Enum->value
+        if ($schema->type === ShapeType::Enum->value
             || $schema->type === ShapeType::IntEnum->value
         ) {
             return $this->buildEnumMemberInfo($schema);
         }
 
-        if (
-            $schema->type !== ShapeType::Structure->value
+        if ($schema->type !== ShapeType::Structure->value
             && $schema->type !== ShapeType::Union->value
         ) {
             return null;
@@ -218,16 +216,14 @@ final class JsonSchemaExtensionProvider
 
         $listMemberResolvedTargetClass = null;
         $listMemberUnionInfo = null;
-        if (
-            $inner !== null
+        if ($inner !== null
             && (
                 $innerType === ShapeType::Enum->value
                 || $innerType === ShapeType::IntEnum->value
             )
         ) {
             $listMemberResolvedTargetClass = $inner->targetClass;
-            if (
-                $listMemberResolvedTargetClass === null
+            if ($listMemberResolvedTargetClass === null
                 && $inner->getMemberCount() === 0
             ) {
                 $listMemberResolvedTargetClass =
@@ -275,16 +271,14 @@ final class JsonSchemaExtensionProvider
 
         $mapValueResolvedTargetClass = null;
         $mapValueUnionInfo = null;
-        if (
-            $value !== null
+        if ($value !== null
             && (
                 $valueType === ShapeType::Enum->value
                 || $valueType === ShapeType::IntEnum->value
             )
         ) {
             $mapValueResolvedTargetClass = $value->targetClass;
-            if (
-                $mapValueResolvedTargetClass === null
+            if ($mapValueResolvedTargetClass === null
                 && $value->getMemberCount() === 0
             ) {
                 $mapValueResolvedTargetClass =
@@ -370,8 +364,7 @@ final class JsonSchemaExtensionProvider
     private static function scanForBigNumber(Schema $schema, array &$visiting): bool
     {
         $type = $schema->type;
-        if (
-            $type === ShapeType::BigInteger->value
+        if ($type === ShapeType::BigInteger->value
             || $type === ShapeType::BigDecimal->value
         ) {
             return true;
@@ -394,8 +387,7 @@ final class JsonSchemaExtensionProvider
             return $found;
         }
 
-        if (
-            $type === ShapeType::Structure->value
+        if ($type === ShapeType::Structure->value
             || $type === ShapeType::Union->value
         ) {
             foreach ($schema->getMembers() as $member) {
