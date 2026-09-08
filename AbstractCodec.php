@@ -10,11 +10,11 @@ use Smithy\Core\Serde\ShapeDeserializerInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
 
 /**
- * Factory for a format's `ShapeSerializerInterface` and `ShapeDeserializerInterface` pair (JSON,
- * CBOR, XML, etc.).
+ * Create serializers and deserializers for one wire format.
  *
- * A codec works with bytes. Protocols use codecs to encode and decode the
- * request or response body.
+ * Codecs translate between Smithy runtime shapes and body bytes. Protocols
+ * remain responsible for HTTP metadata and use codecs only to encode and
+ * decode request and response bodies.
  *
  * @internal Implementations are subject to change.
  */
@@ -30,16 +30,14 @@ abstract class AbstractCodec
      */
     public function createMembersBuffer(Schema $schema): array
     {
-        $memberCount = $schema->getMemberCount();
-
-        return $memberCount ? \array_fill(0, $memberCount, null) : [];
+        return \array_fill(0, $schema->getMemberCount(), null);
     }
 
     /**
      * Create a serializer for this codec's format.
      *
-     * @return ShapeSerializerInterface Fresh serializer instance ready to receive `serializeXxx`
-     *                                  calls.
+     * @return ShapeSerializerInterface Fresh serializer ready to receive
+     *                                  serialization calls.
      */
     abstract public function createSerializer(): ShapeSerializerInterface;
 

@@ -16,23 +16,20 @@ use Smithy\Core\Serde\TimestampFormat;
  */
 abstract class AbstractCodecSettings
 {
-    public readonly ?string $serviceNamespace;
     public readonly TimestampFormat $defaultTimestampFormat;
-    public readonly bool $honorTimestampFormatTrait;
 
     /**
-     * @param string|null $serviceNamespace Service namespace for codec consumers.
-     * @param TimestampFormat|null $defaultTimestampFormat Fallback timestamp format.
-     * @param bool $honorTimestampFormatTrait Whether to honor `timestampFormat`.
+     * @param ?string $serviceNamespace Service namespace for codec consumers.
+     * @param ?TimestampFormat $defaultTimestampFormat Fallback timestamp format.
+     * @param bool $honorTimestampFormatTrait Whether to honor the modeled
+     *                                        `timestampFormat` trait.
      */
     public function __construct(
-        ?string $serviceNamespace = null,
+        public readonly ?string $serviceNamespace = null,
         ?TimestampFormat $defaultTimestampFormat = null,
-        bool $honorTimestampFormatTrait = true
+        public readonly bool $honorTimestampFormatTrait = true
     ) {
-        $this->serviceNamespace = $serviceNamespace;
         $this->defaultTimestampFormat = $defaultTimestampFormat
             ?? TimestampFormat::EpochSeconds;
-        $this->honorTimestampFormatTrait = $honorTimestampFormatTrait;
     }
 }
