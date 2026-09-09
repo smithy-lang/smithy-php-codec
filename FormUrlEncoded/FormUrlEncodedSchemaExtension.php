@@ -16,54 +16,22 @@ use Smithy\Core\Serde\TimestampFormat;
  */
 final class FormUrlEncodedSchemaExtension
 {
+    public const WIRE_MODE_RESOLVED = 0;
+    public const WIRE_MODE_CAPITALIZED_RESOLVED = 1;
+    public const WIRE_MODE_RAW = 2;
+    public const WIRE_MODE_CAPITALIZED_RAW = 3;
+
     public function __construct(
         /**
-         * `memberIndex => wire key segment` for every direct member of
-         * this struct / union schema. Resolution follows the awsQuery
-         * "Query key resolution" spec:
-         *   1. `@xmlName` on the member wins.
-         *   2. Otherwise the Smithy member name is used.
-         *
-         * The result is a bare key segment (no `.` separators), ready
-         * to concatenate into the outgoing prefix stack in the
-         * serializer's `serializeXxx` methods.
-         *
-         * @var array<int, string>
-         */
-        public readonly array $memberWireNames = [],
-
-
-        /**
-         * `memberIndex => wire key segment` for every direct member of
-         * this struct / union schema under the `ec2Query` naming
-         * rules:
-         *   1. `@ec2QueryName` on the member wins.
-         *   2. Otherwise `@xmlName` with the first letter capitalized.
-         *   3. Otherwise the member name with the first letter
-         *      capitalized.
-         *
-         * @var array<int, string>
-         */
-        public readonly array $ec2MemberWireNames = [],
-
-        /**
          * Member wire-name tables indexed by serializer naming mode.
+         *
+         * Modes are resolved names, capitalized resolved names, raw
+         * Smithy names, and capitalized raw Smithy names. Each table
+         * maps member indexes to encoded wire key segments.
          *
          * @var array<int, array<int, string>>
          */
         public readonly array $memberWireNamesByMode = [],
-
-
-        /**
-         * Sparse `memberIndex => bool` map: `true` when the member's
-         * container carries `@xmlFlattened`. Consulted by the list and
-         * map serializer paths to decide whether to emit the container
-         * name + `.member` / `.entry` scaffolding or unwrap directly
-         * into the outer key path.
-         *
-         * @var array<int, bool>
-         */
-        public readonly array $memberIsFlattened = [],
 
         /**
          * Sparse `memberIndex => TimestampFormat` map for timestamp
@@ -77,15 +45,6 @@ final class FormUrlEncodedSchemaExtension
         public readonly array $tsFormats = [],
 
         /**
-         * Precomputed {@see TimestampFormat} for a timestamp-typed
-         * *member* schema, or null when the member isn't a timestamp
-         * or has no `@timestampFormat` trait. Resolved once from the
-         * trait string in the provider so serialization can dispatch
-         * on the enum directly.
-         */
-        public readonly ?TimestampFormat $timestampFormat = null,
-
-        /**
          * Wire key segment for list items, resolved once per list
          * schema. Follows the awsQuery spec:
          *   - `@xmlName` on the list member wins.
@@ -97,7 +56,7 @@ final class FormUrlEncodedSchemaExtension
          * `@xmlName("Hi")` on the outer flattened member overriding
          * the inner list member's `@xmlName("item")`). The flattened
          * key path uses the outer member's name / `@xmlName`. That
-         * lives in the containing struct's `$memberWireNames`, so
+         * lives in the containing struct's `$memberWireNamesByMode`, so
          * this field is read only when `$flattened` is false.
          */
         public readonly ?string $listMemberName = null,
@@ -135,7 +94,7 @@ final class FormUrlEncodedSchemaExtension
         public readonly ?TimestampFormat $listMemberTimestampFormat = null,
 
         /**
-         * Precomputed full awsQuery list-item prefix fragment for a
+         * Precomputed full resolved list-item prefix fragment for a
          * list-typed member schema:
          *   - `{$wireName}.{$listMemberName}.` (default)
          *   - `{$wireName}.` (`@xmlFlattened`)
@@ -143,16 +102,17 @@ final class FormUrlEncodedSchemaExtension
          * Ready to append to the current outer prefix. Null for
          * schemas that are not member-shaped lists.
          */
-        public readonly ?string $memberListPrefix = null,
+        public readonly ?string $resolvedMemberListPrefix = null,
 
         /**
-         * Precomputed full ec2Query list-item prefix fragment for a
-         * list-typed member schema: always `{$ec2WireName}.`.
+         * Precomputed full capitalized-resolved list-item prefix
+         * fragment for a list-typed member schema: always
+         * `{$capitalizedResolvedWireName}.`.
          *
          * Ready to append to the current outer prefix. Null for
          * schemas that are not member-shaped lists.
          */
-        public readonly ?string $ec2MemberListPrefix = null,
+        public readonly ?string $capitalizedResolvedMemberListPrefix = null,
 
         /**
          * Wire key segment for a map's key entries, resolved once per
@@ -179,23 +139,6 @@ final class FormUrlEncodedSchemaExtension
          * Precomputed `{$mapValueName}=` fragment for scalar map-value emits.
          */
         public readonly ?string $mapValueAssignment = null,
-
-        /**
-         * Wrapper segment for each map entry: `"entry"` for
-         * non-flattened maps, or the outer member's name / `@xmlName`
-         * when the map is flattened. In the flattened case the
-         * serializer never emits this segment; it's carried here for
-         * completeness so callers who want the non-flattened wrapper
-         * always find it in the same slot.
-         */
-        public readonly ?string $mapEntryName = null,
-
-        /**
-         * Pre-resolved map key Schema. Handed to the serializer's
-         * key-write path so map serialize calls don't reach back to
-         * the outer schema for it.
-         */
-        public readonly ?Schema $mapKeySchema = null,
 
         /**
          * Pre-resolved map value Schema, mirroring
@@ -239,24 +182,24 @@ final class FormUrlEncodedSchemaExtension
         public readonly array $unionMembersByName = [],
 
         /**
-         * `memberName => resolved wire name` for union variants. `@xmlName`
-         * on the variant wins; otherwise the Smithy `memberName` is used.
-         * Populated at provider time so
+         * `memberName => resolved wire name` for union variants.
+         * `@xmlName` on the variant wins; otherwise the Smithy
+         * `memberName` is used. Populated at provider time so
          * {@see FormUrlEncodedSerializer::serializeUnion} reads the
          * variant's key segment via a single array offset instead of a
          * `getTrait(T_XML_NAME) ?? memberName` chain on the hot path.
          *
          * @var array<string, string>
          */
-        public readonly array $unionMemberWireNames = [],
+        public readonly array $resolvedUnionMemberWireNames = [],
 
         /**
-         * `memberName => resolved ec2Query wire name` for union
+         * `memberName => capitalized resolved wire name` for union
          * variants.
          *
          * @var array<string, string>
          */
-        public readonly array $ec2UnionMemberWireNames = [],
+        public readonly array $capitalizedResolvedUnionMemberWireNames = [],
 
         /**
          * Sparse `memberName => TimestampFormat` map for union variants
@@ -281,19 +224,6 @@ final class FormUrlEncodedSchemaExtension
          *     2: ?TimestampFormat
          * }>
          */
-        public readonly array $unionEncodeByMemberIndex = [],
-
-        /**
-         * Pre-resolved target class FQCN for enum / intEnum / struct /
-         * union member schemas, resolved by the provider at build time
-         * so serde paths read one class-string pointer instead of walking
-         * {@see \Smithy\Core\Serde\Schema::resolveTarget()} per element.
-         * Null when the member has no generated target class. Mirrors
-         * {@see \Smithy\Codec\Json\JsonSchemaExtension::$resolvedTargetClass}
-         * and {@see \Smithy\Codec\Xml\XmlSchemaExtension::$resolvedTargetClass}.
-         *
-         * @var class-string|null
-         */
-        public readonly ?string $resolvedTargetClass = null
+        public readonly array $unionEncodeByMemberIndex = []
     ) {}
 }

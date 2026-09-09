@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Smithy\Codec\FormUrlEncoded;
 
 use Psr\Http\Message\StreamInterface;
-use Smithy\Codec\Exception\CodecException;
 use Smithy\Codec\AbstractCodec;
+use Smithy\Codec\Exception\CodecException;
 use Smithy\Core\Serde\ShapeDeserializerInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
 
@@ -45,7 +45,9 @@ final class FormUrlEncodedCodec extends AbstractCodec
      *
      * @throws CodecException
      */
-    public function createDeserializer(StreamInterface $source): ShapeDeserializerInterface
+    public function createDeserializer(
+        StreamInterface $source
+    ): ShapeDeserializerInterface
     {
         throw new CodecException(
             'FormUrlEncodedCodec does not support deserialization. '

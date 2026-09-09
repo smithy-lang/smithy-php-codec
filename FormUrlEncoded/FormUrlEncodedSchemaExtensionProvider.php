@@ -7,8 +7,8 @@ namespace Smithy\Codec\FormUrlEncoded;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SchemaExtensionKey;
 use Smithy\Core\Serde\SchemaExtensionProviderInterface;
-use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\TimestampFormat;
+use Smithy\Core\Shape\ShapeType;
 
 /**
  * Provide precomputed form-urlencoded metadata for schemas.
@@ -72,17 +72,21 @@ final class FormUrlEncodedSchemaExtensionProvider
         return null;
     }
 
-    private function buildStructInfo(Schema $schema): FormUrlEncodedSchemaExtension
+    /**
+     * Precompute structure or union member metadata.
+     */
+    private function buildStructInfo(
+        Schema $schema
+    ): FormUrlEncodedSchemaExtension
     {
-        $memberWireNames = [];
-        $ec2MemberWireNames = [];
+        $resolvedMemberWireNames = [];
+        $capitalizedResolvedMemberWireNames = [];
         $rawMemberWireNames = [];
         $capitalizedRawMemberWireNames = [];
-        $memberIsFlattened = [];
         $tsFormats = [];
         $unionMembersByName = [];
-        $unionMemberWireNames = [];
-        $ec2UnionMemberWireNames = [];
+        $resolvedUnionMemberWireNames = [];
+        $capitalizedResolvedUnionMemberWireNames = [];
         $unionMemberTsFormats = [];
         $unionEncodeByMemberIndex = [];
         $isUnion = $schema->type === ShapeType::Union->value;
@@ -93,12 +97,12 @@ final class FormUrlEncodedSchemaExtensionProvider
             // Query key resolution: `@xmlName` on the member wins,
             // otherwise the Smithy member name. See the spec's "Query
             // key resolution" table.
-            $wireName = self::encodeQuerySegment(
+            $resolvedWireName = self::encodeQuerySegment(
                 $memberSchema->getTrait(Schema::T_XML_NAME)
                     ?? $memberSchema->memberName
             );
-            $ec2WireName = self::encodeQuerySegment(
-                $this->resolveEc2WireName($memberSchema)
+            $capitalizedResolvedWireName = self::encodeQuerySegment(
+                $this->resolveCapitalizedWireName($memberSchema)
             );
             $rawWireName = self::encodeQuerySegment(
                 (string) $memberSchema->memberName
@@ -106,22 +110,12 @@ final class FormUrlEncodedSchemaExtensionProvider
             $capitalizedRawWireName = self::encodeQuerySegment(
                 \ucfirst((string) $memberSchema->memberName)
             );
-            $memberWireNames[$idx] = $wireName;
-            $ec2MemberWireNames[$idx] = $ec2WireName;
+            $resolvedMemberWireNames[$idx] = $resolvedWireName;
+            $capitalizedResolvedMemberWireNames[$idx]
+                = $capitalizedResolvedWireName;
             $rawMemberWireNames[$idx] = $rawWireName;
             $capitalizedRawMemberWireNames[$idx] =
                 $capitalizedRawWireName;
-
-            // Flattened flag is sparse. Populate it only for members
-            // whose container carries `@xmlFlattened`. Consulted by
-            // the list / map serialize paths to decide whether to emit
-            // the container's `.member` / `.entry` scaffolding.
-            if (($memberSchema->type === ShapeType::List_->value
-                || $memberSchema->type === ShapeType::Map->value)
-                && $memberSchema->hasTrait(Schema::T_XML_FLATTENED)
-            ) {
-                $memberIsFlattened[$idx] = true;
-            }
 
             // Timestamp format is sparse. Populate it only when the
             // member carries an explicit `@timestampFormat` trait. The
@@ -144,9 +138,11 @@ final class FormUrlEncodedSchemaExtensionProvider
             // trait lookups have no place on the serde hot path.
             if ($isUnion) {
                 $unionMembersByName[$memberSchema->memberName] = $memberSchema;
-                $unionMemberWireNames[$memberSchema->memberName] = $wireName;
-                $ec2UnionMemberWireNames[$memberSchema->memberName]
-                    = $ec2WireName;
+                $resolvedUnionMemberWireNames[$memberSchema->memberName]
+                    = $resolvedWireName;
+                $capitalizedResolvedUnionMemberWireNames[
+                    $memberSchema->memberName
+                ] = $capitalizedResolvedWireName;
                 if ($memberTsFmt !== null) {
                     $unionMemberTsFormats[$memberSchema->memberName]
                         = $memberTsFmt;
@@ -154,8 +150,8 @@ final class FormUrlEncodedSchemaExtensionProvider
                 $unionEncodeByMemberIndex[$idx] = [
                     $memberSchema,
                     [
-                        $wireName,
-                        $ec2WireName,
+                        $resolvedWireName,
+                        $capitalizedResolvedWireName,
                         $rawWireName,
                         $capitalizedRawWireName
                     ],
@@ -165,32 +161,36 @@ final class FormUrlEncodedSchemaExtensionProvider
         }
 
         return new FormUrlEncodedSchemaExtension(
-            memberWireNames: $memberWireNames,
-            ec2MemberWireNames: $ec2MemberWireNames,
             memberWireNamesByMode: [
-                $memberWireNames,
-                $ec2MemberWireNames,
-                $rawMemberWireNames,
-                $capitalizedRawMemberWireNames
+                FormUrlEncodedSchemaExtension::WIRE_MODE_RESOLVED
+                    => $resolvedMemberWireNames,
+                FormUrlEncodedSchemaExtension::WIRE_MODE_CAPITALIZED_RESOLVED
+                    => $capitalizedResolvedMemberWireNames,
+                FormUrlEncodedSchemaExtension::WIRE_MODE_RAW
+                    => $rawMemberWireNames,
+                FormUrlEncodedSchemaExtension::WIRE_MODE_CAPITALIZED_RAW
+                    => $capitalizedRawMemberWireNames
             ],
-            memberIsFlattened: $memberIsFlattened,
             tsFormats: $tsFormats,
             unionMembersByName: $unionMembersByName,
-            unionMemberWireNames: $unionMemberWireNames,
-            ec2UnionMemberWireNames: $ec2UnionMemberWireNames,
+            resolvedUnionMemberWireNames: $resolvedUnionMemberWireNames,
+            capitalizedResolvedUnionMemberWireNames:
+                $capitalizedResolvedUnionMemberWireNames,
             unionMemberTsFormats: $unionMemberTsFormats,
             unionEncodeByMemberIndex: $unionEncodeByMemberIndex
         );
     }
 
     /**
-     * Resolve the `ec2Query` wire name for a member.
+     * Resolve the capitalized wire name for a member.
      */
-    private function resolveEc2WireName(Schema $schema): string
+    private function resolveCapitalizedWireName(Schema $schema): string
     {
-        $ec2QueryName = $schema->getTrait(Schema::T_EC2_QUERY_NAME);
-        if (\is_string($ec2QueryName) && $ec2QueryName !== '') {
-            return $ec2QueryName;
+        $preferredWireName = $schema->getTrait(
+            Schema::T_EC2_QUERY_NAME
+        );
+        if (\is_string($preferredWireName) && $preferredWireName !== '') {
+            return $preferredWireName;
         }
 
         $xmlName = $schema->getTrait(Schema::T_XML_NAME);
@@ -201,25 +201,25 @@ final class FormUrlEncodedSchemaExtensionProvider
         return \ucfirst((string) $schema->memberName);
     }
 
-
-    private function buildMemberInfo(Schema $schema): FormUrlEncodedSchemaExtension
+    /**
+     * Precompute metadata for a list or map member schema.
+     */
+    private function buildMemberInfo(
+        Schema $schema
+    ): ?FormUrlEncodedSchemaExtension
     {
-        $awsMemberWireName = self::encodeQuerySegment(
+        if ($schema->type !== ShapeType::List_->value
+            && $schema->type !== ShapeType::Map->value
+        ) {
+            return null;
+        }
+
+        $resolvedMemberWireName = self::encodeQuerySegment(
             $schema->getTrait(Schema::T_XML_NAME) ?? $schema->memberName
         );
-        $ec2MemberWireName = self::encodeQuerySegment(
-            $this->resolveEc2WireName($schema)
+        $capitalizedResolvedMemberWireName = self::encodeQuerySegment(
+            $this->resolveCapitalizedWireName($schema)
         );
-
-        // Pre-resolve the member's target class for enum / intEnum /
-        // struct / union member schemas. Mirrors the same lift on the
-        // JSON and XML providers so the serializer can coerce enum
-        // variants without walking `resolveTarget()` on the hot path.
-        $resolvedTarget = $schema->getMemberCount() === 0
-            ? $schema->resolveTarget()
-            : $schema;
-        $resolvedTargetClass = $schema->targetClass
-            ?? $resolvedTarget?->targetClass;
 
         // List-typed member: precompute item name + flattened flag +
         // inner member type / schema so the serializer's list path
@@ -229,7 +229,7 @@ final class FormUrlEncodedSchemaExtensionProvider
             $listMember = $schema->getListMember();
             $flattened = $schema->hasTrait(Schema::T_XML_FLATTENED);
             // Only the non-flattened case ever emits an item wrapper.
-            // For flattened lists the outer struct's `$memberWireNames`
+            // For flattened lists the outer struct's wire-name table
             // carries the key; the inner member's `@xmlName` is
             // ignored (see the spec's "Collections" example with
             // `@xmlName("Hi")` on the outer flattened member).
@@ -257,11 +257,11 @@ final class FormUrlEncodedSchemaExtensionProvider
                 listMemberType: $listMember?->type,
                 listMemberSchema: $listMember,
                 listMemberTimestampFormat: $listTsFmt,
-                memberListPrefix: $flattened
-                    ? $awsMemberWireName . '.'
-                    : $awsMemberWireName . '.' . $listMemberName . '.',
-                ec2MemberListPrefix: $ec2MemberWireName . '.',
-                resolvedTargetClass: $resolvedTargetClass
+                resolvedMemberListPrefix: $flattened
+                    ? $resolvedMemberWireName . '.'
+                    : $resolvedMemberWireName . '.' . $listMemberName . '.',
+                capitalizedResolvedMemberListPrefix:
+                    $capitalizedResolvedMemberWireName . '.'
             );
         }
 
@@ -277,11 +277,6 @@ final class FormUrlEncodedSchemaExtensionProvider
             $valueName = $mapValue?->getTrait(Schema::T_XML_NAME) ?? 'value';
             $keyName = self::encodeQuerySegment($keyName);
             $valueName = self::encodeQuerySegment($valueName);
-            $entryName = $flattened
-                ? self::encodeQuerySegment(
-                    $schema->getTrait(Schema::T_XML_NAME) ?? $schema->memberName
-                )
-                : self::encodeQuerySegment('entry');
 
             // Map-of-timestamp values: same trait-lift-to-provider
             // pattern as list timestamps above.
@@ -300,37 +295,23 @@ final class FormUrlEncodedSchemaExtensionProvider
                 mapKeyAssignment: $keyName . '=',
                 mapValueName: $valueName,
                 mapValueAssignment: $valueName . '=',
-                mapEntryName: $entryName,
-                mapKeySchema: $mapKey,
                 mapValueSchema: $mapValue,
                 mapValueType: $mapValue?->type,
                 mapValueTimestampFormat: $mapValueTsFmt,
                 memberMapEntryPrefix: $flattened
-                    ? $awsMemberWireName . '.'
-                    : $awsMemberWireName . '.entry.',
-                resolvedTargetClass: $resolvedTargetClass
+                    ? $resolvedMemberWireName . '.'
+                    : $resolvedMemberWireName . '.entry.'
             );
         }
-
-
-        // Scalar member with a timestamp format resolves the trait
-        // string to an enum here so the serializer dispatches without
-        // repeating that work per call. Non-timestamp members skip
-        // the resolve and leave `$timestampFormat` null.
-        $timestampFormat = null;
-        if ($schema->type === ShapeType::Timestamp->value) {
-            $timestampFormat = TimestampFormat::fromTraitString(
-                $schema->getTrait(Schema::T_TIMESTAMP_FORMAT)
-            );
-        }
-
-        return new FormUrlEncodedSchemaExtension(
-            timestampFormat: $timestampFormat,
-            resolvedTargetClass: $resolvedTargetClass
-        );
+        return null;
     }
 
-    private function buildListInfo(Schema $schema): FormUrlEncodedSchemaExtension
+    /**
+     * Precompute metadata for a root list schema.
+     */
+    private function buildListInfo(
+        Schema $schema
+    ): FormUrlEncodedSchemaExtension
     {
         $listMember = $schema->getListMember();
         $flattened = $schema->hasTrait(Schema::T_XML_FLATTENED);
@@ -357,11 +338,20 @@ final class FormUrlEncodedSchemaExtensionProvider
         );
     }
 
+    /**
+     * Precompute metadata for a root map schema.
+     */
     private function buildMapInfo(Schema $schema): FormUrlEncodedSchemaExtension
     {
         $mapKey = $schema->getMapKey();
         $mapValue = $schema->getMapValue();
         $flattened = $schema->hasTrait(Schema::T_XML_FLATTENED);
+        $keyName = self::encodeQuerySegment(
+            $mapKey?->getTrait(Schema::T_XML_NAME) ?? 'key'
+        );
+        $valueName = self::encodeQuerySegment(
+            $mapValue?->getTrait(Schema::T_XML_NAME) ?? 'value'
+        );
         $mapValueTsFmt = null;
         if ($mapValue !== null
             && $mapValue->type === ShapeType::Timestamp->value
@@ -373,38 +363,19 @@ final class FormUrlEncodedSchemaExtensionProvider
 
         return new FormUrlEncodedSchemaExtension(
             flattened: $flattened,
-            mapKeyName: $mapKey !== null
-                ? self::encodeQuerySegment(
-                    $mapKey->getTrait(Schema::T_XML_NAME) ?? 'key'
-                )
-                : self::encodeQuerySegment('key'),
-            mapKeyAssignment: $mapKey !== null
-                ? self::encodeQuerySegment(
-                    $mapKey->getTrait(Schema::T_XML_NAME) ?? 'key'
-                ) . '='
-                : self::encodeQuerySegment('key') . '=',
-            mapValueName: $mapValue !== null
-                ? self::encodeQuerySegment(
-                    $mapValue->getTrait(Schema::T_XML_NAME) ?? 'value'
-                )
-                : self::encodeQuerySegment('value'),
-            mapValueAssignment: $mapValue !== null
-                ? self::encodeQuerySegment(
-                    $mapValue->getTrait(Schema::T_XML_NAME) ?? 'value'
-                ) . '='
-                : self::encodeQuerySegment('value') . '=',
-            mapEntryName: $flattened
-                ? self::encodeQuerySegment(
-                    $schema->getTrait(Schema::T_XML_NAME) ?? $schema->memberName
-                )
-                : self::encodeQuerySegment('entry'),
-            mapKeySchema: $mapKey,
+            mapKeyName: $keyName,
+            mapKeyAssignment: $keyName . '=',
+            mapValueName: $valueName,
+            mapValueAssignment: $valueName . '=',
             mapValueSchema: $mapValue,
             mapValueType: $mapValue?->type,
             mapValueTimestampFormat: $mapValueTsFmt
         );
     }
 
+    /**
+     * Encode one query key segment without encoding separators.
+     */
     private static function encodeQuerySegment(string $segment): string
     {
         return \rawurlencode($segment);

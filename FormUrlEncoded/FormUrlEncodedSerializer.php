@@ -8,11 +8,11 @@ use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableStructInterface;
 use Smithy\Core\Serde\ShapeSerializerInterface;
-use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\TimestampFormat;
 use Smithy\Core\Shape\BigDecimal;
 use Smithy\Core\Shape\BigInteger;
 use Smithy\Core\Shape\Document\DocumentInterface;
+use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Shape\UnionInterface;
 
 /**
@@ -24,11 +24,6 @@ use Smithy\Core\Shape\UnionInterface;
  */
 final class FormUrlEncodedSerializer implements ShapeSerializerInterface
 {
-    private const WIRE_MODE_QUERY = 0;
-    private const WIRE_MODE_EC2 = 1;
-    private const WIRE_MODE_RAW = 2;
-    private const WIRE_MODE_CAPITALIZED_RAW = 3;
-
     private readonly FormUrlEncodedCodecSettings $settings;
     private readonly bool $honorTimestampFormatTrait;
     private readonly bool $honorXmlName;
@@ -50,7 +45,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     /**
      * Wire-name lookup for the current struct / union frame, or `null`
      * at the outermost level before any `beginStruct` runs. Sourced from
-     * {@see FormUrlEncodedSchemaExtension::$memberWireNames}.
+     * {@see FormUrlEncodedSchemaExtension::$memberWireNamesByMode}.
      *
      * @var array<int, string>|null
      */
@@ -87,13 +82,14 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $this->wireNameMode = match (true) {
             $this->honorXmlName
                 && !$this->capitalizeResolvedWireNames
-                    => self::WIRE_MODE_QUERY,
+                    => FormUrlEncodedSchemaExtension::WIRE_MODE_RESOLVED,
             $this->honorXmlName
                 && $this->capitalizeResolvedWireNames
-                    => self::WIRE_MODE_EC2,
+                    => FormUrlEncodedSchemaExtension::
+                        WIRE_MODE_CAPITALIZED_RESOLVED,
             !$this->capitalizeResolvedWireNames
-                => self::WIRE_MODE_RAW,
-            default => self::WIRE_MODE_CAPITALIZED_RAW
+                => FormUrlEncodedSchemaExtension::WIRE_MODE_RAW,
+            default => FormUrlEncodedSchemaExtension::WIRE_MODE_CAPITALIZED_RAW
         };
     }
 
@@ -113,7 +109,11 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
      *
      * @return void
      */
-    public function serializeBoolean(Schema $schema, bool $value, int $idx): void
+    public function serializeBoolean(
+        Schema $schema,
+        bool $value,
+        int $idx
+    ): void
     {
         $this->buffer .= $this->prefix
             . $this->wireNames[$idx]
@@ -121,7 +121,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             . ($value ? 'true' : 'false')
             . '&';
     }
-
 
     /**
      * Serialize an integer member.
@@ -137,7 +136,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             . '&';
     }
 
-
     /**
      * Serialize a float member.
      *
@@ -150,7 +148,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             'NAN'  => 'NaN',
             'INF'  => 'Infinity',
             '-INF' => '-Infinity',
-            default => $str,
+            default => $str
         };
         $this->buffer .= $this->prefix
             . $this->wireNames[$idx]
@@ -158,7 +156,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             . \rawurlencode($s)
             . '&';
     }
-
 
     /**
      * Serialize a big-integer member.
@@ -178,7 +175,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             . '&';
     }
 
-
     /**
      * Serialize a big-decimal member.
      *
@@ -197,13 +193,16 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             . '&';
     }
 
-
     /**
      * Serialize a string member.
      *
      * @return void
      */
-    public function serializeString(Schema $schema, string $value, int $idx): void
+    public function serializeString(
+        Schema $schema,
+        string $value,
+        int $idx
+    ): void
     {
         $this->buffer .= $this->prefix
             . $this->wireNames[$idx]
@@ -211,7 +210,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             . \rawurlencode($value)
             . '&';
     }
-
 
     /**
      * Serialize a blob member.
@@ -226,7 +224,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             . \rawurlencode(\base64_encode($value))
             . '&';
     }
-
 
     /**
      * Serialize a timestamp member.
@@ -260,7 +257,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     {
         if ($list === []) {
             if ($this->settings->alwaysFlattenLists) {
-
                 return;
             }
 
@@ -332,7 +328,8 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
 
         $savedPrefix = $this->prefix;
         $savedWireNames = $this->wireNames;
-        $savedTsFormats = $this->tsFormats;
+        $this->prefix = $itemPrefix;
+        $this->wireNames = [0 => ''];
 
         switch ($mt) {
             case ShapeType::Structure->value:
@@ -343,8 +340,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                         $counter++;
                         continue;
                     }
-                    $this->wireNames = [0 => (string) $counter];
-                    $this->prefix = $itemPrefix;
+                    $this->wireNames[0] = (string) $counter;
                     if ($mt === ShapeType::Structure->value) {
                         $this->serializeStruct($memberSchema, $item, 0);
                     } else {
@@ -361,8 +357,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                         $counter++;
                         continue;
                     }
-                    $this->wireNames = [0 => (string) $counter];
-                    $this->prefix = $itemPrefix;
+                    $this->wireNames[0] = (string) $counter;
                     $this->serializeList($memberSchema, $item, 0);
                     $counter++;
                 }
@@ -375,8 +370,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                         $counter++;
                         continue;
                     }
-                    $this->wireNames = [0 => (string) $counter];
-                    $this->prefix = $itemPrefix;
+                    $this->wireNames[0] = (string) $counter;
                     $this->serializeMap($memberSchema, $item, 0);
                     $counter++;
                 }
@@ -385,9 +379,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
 
         $this->prefix = $savedPrefix;
         $this->wireNames = $savedWireNames;
-        $this->tsFormats = $savedTsFormats;
     }
-
 
     /**
      * Serialize a map member.
@@ -407,7 +399,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         }
 
         if ($map === []) {
-
             return;
         }
 
@@ -473,7 +464,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
 
         $savedPrefix = $this->prefix;
         $savedWireNames = $this->wireNames;
-        $savedTsFormats = $this->tsFormats;
+        $this->wireNames = [0 => $valueName];
 
         $counter = 1;
         foreach ($map as $k => $v) {
@@ -490,11 +481,10 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                 continue;
             }
 
+            $this->prefix = $entryPrefix;
             switch ($valueType) {
                 case ShapeType::Structure->value:
                 case ShapeType::Union->value:
-                    $this->prefix = $entryPrefix;
-                    $this->wireNames = [0 => $valueName];
                     if ($valueType === ShapeType::Structure->value) {
                         $this->serializeStruct($valueSchema, $v, 0);
                     } else {
@@ -502,13 +492,9 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                     }
                     break;
                 case ShapeType::List_->value:
-                    $this->wireNames = [0 => $valueName];
-                    $this->prefix = $entryPrefix;
                     $this->serializeList($valueSchema, $v, 0);
                     break;
                 case ShapeType::Map->value:
-                    $this->wireNames = [0 => $valueName];
-                    $this->prefix = $entryPrefix;
                     $this->serializeMap($valueSchema, $v, 0);
                     break;
             }
@@ -518,7 +504,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
 
         $this->prefix = $savedPrefix;
         $this->wireNames = $savedWireNames;
-        $this->tsFormats = $savedTsFormats;
     }
 
     /**
@@ -555,7 +540,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $this->tsFormats = $info?->tsFormats ?? [];
     }
 
-
     /**
      * Push a structure frame.
      *
@@ -582,7 +566,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $this->tsFormats = $info?->tsFormats ?? [];
     }
 
-
     /**
      * Pop a structure frame.
      *
@@ -596,7 +579,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $this->tsFormats = $this->timestampFormatStack[$depth];
     }
 
-
     /**
      * Serialize a union member.
      *
@@ -607,7 +589,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         /** @var UnionInterface $union */
         $value = $union->value();
         if ($value === null) {
-
             return;
         }
 
@@ -618,7 +599,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $entry = $info?->unionEncodeByMemberIndex[
             $union->getMemberIndex()
         ] ?? null;
-        $tag = null;
         if ($entry !== null) {
             $variantSchema = $entry[0];
             $variantWire = $entry[1][$this->wireNameMode];
@@ -636,7 +616,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             $variantTsFmt = $info?->unionMemberTsFormats[$tag] ?? null;
         }
         if ($variantSchema === null) {
-
             return;
         }
 
@@ -695,7 +674,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $this->tsFormats = $savedTsFormats;
     }
 
-
     /**
      * Reject document serialization.
      *
@@ -707,14 +685,14 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         Schema $schema,
         ?DocumentInterface $value,
         int $idx
-    ): void {
+    ): void
+    {
         throw new SerializationException(
             'This form-urlencoded mode does not support document '
             . 'types (member: '
             . ($schema->memberName ?? $schema->id) . ')'
         );
     }
-
 
     /**
      * Reset serializer state.
@@ -734,7 +712,6 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $this->wireNameStack = [];
         $this->timestampFormatStack = [];
     }
-
 
     /**
      * Return the accumulated body and reset the buffer.
@@ -1045,7 +1022,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                     'NAN'  => 'NaN',
                     'INF'  => 'Infinity',
                     '-INF' => '-Infinity',
-                    default => $str,
+                    default => $str
                 };
                 $this->buffer .= $key . '=' . \rawurlencode($number) . '&';
 
@@ -1089,8 +1066,8 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         }
 
         return $this->capitalizeResolvedWireNames
-            ? $info?->ec2MemberListPrefix
-            : $info?->memberListPrefix;
+            ? $info?->capitalizedResolvedMemberListPrefix
+            : $info?->resolvedMemberListPrefix;
     }
 
     private function resolveUnionVariantWireName(
@@ -1101,9 +1078,11 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     {
         if ($this->honorXmlName) {
             return $this->capitalizeResolvedWireNames
-                ? (($info?->ec2UnionMemberWireNames[$tag] ?? null)
+                ? (($info?->capitalizedResolvedUnionMemberWireNames[
+                    $tag
+                ] ?? null)
                     ?? $variantSchema->memberName)
-                : (($info?->unionMemberWireNames[$tag] ?? null)
+                : (($info?->resolvedUnionMemberWireNames[$tag] ?? null)
                     ?? $variantSchema->memberName);
         }
 
