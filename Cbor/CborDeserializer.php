@@ -113,6 +113,29 @@ final class CborDeserializer implements ShapeDeserializerInterface
     }
 
     /**
+     * Decode a type-preserving tree for semantic CBOR comparison.
+     *
+     * The result normalizes map ordering and encoding widths while retaining
+     * data item types and tags.
+     *
+     * @return array<string, mixed>
+     *
+     * @internal
+     */
+    public function decodeComparableValue(): array
+    {
+        $this->idx = 0;
+        $this->depth = 0;
+        $value = $this->readComparableValue();
+
+        if ($this->idx !== $this->length) {
+            $this->malformed();
+        }
+
+        return $value;
+    }
+
+    /**
      * Read a typed structure into preallocated member slots.
      *
      * The schema-specific branches are intentionally specialized here to keep
@@ -1450,6 +1473,250 @@ final class CborDeserializer implements ShapeDeserializerInterface
                 * (1 + $mant / 1024)
             ),
         };
+    }
+
+    /**
+     * Read a type-preserving CBOR value for semantic comparison.
+     *
+     * @return array<string, mixed>
+     */
+    private function readComparableValue(): array
+    {
+        $initial = $this->readInitialByte();
+        $major = $initial >> 5;
+        $info = $initial & 0x1F;
+
+        return match ($major) {
+            self::MAJOR_POSINT,
+            self::MAJOR_NEGINT => [
+                'type' => 'integer',
+                'value' => $this->readIntegerFromMajorAndInfo(
+                    $major,
+                    $info
+                )
+            ],
+            self::MAJOR_BYTESTRING,
+            self::MAJOR_TEXTSTRING => $this->readComparableString(
+                $major,
+                $info
+            ),
+            self::MAJOR_ARRAY => $this->readComparableArray($info),
+            self::MAJOR_MAP => $this->readComparableMap($info),
+            self::MAJOR_TAG => $this->readComparableTag($info),
+            self::MAJOR_SIMPLE => $this->readComparableSimple($info),
+            default => $this->malformed()
+        };
+    }
+
+    /**
+     * Read a comparable byte or text string.
+     *
+     * @return array{type: string, value: string}
+     */
+    private function readComparableString(int $major, int $info): array
+    {
+        $value = '';
+        if ($info === self::INFO_INDEFINITE) {
+            while (!$this->consumeBreak()) {
+                $initial = $this->readInitialByte();
+                $chunkMajor = $initial >> 5;
+                $chunkInfo = $initial & 0x1F;
+                if ($chunkMajor !== $major
+                    || $chunkInfo === self::INFO_INDEFINITE
+                ) {
+                    $this->malformed();
+                }
+                $value .= $this->readBytes(
+                    $this->readLengthFromInfo($chunkInfo)
+                );
+            }
+        } else {
+            $value = $this->readBytes(
+                $this->readLengthFromInfo($info)
+            );
+        }
+
+        return [
+            'type' => $major === self::MAJOR_BYTESTRING
+                ? 'byte-string'
+                : 'text-string',
+            'value' => $value
+        ];
+    }
+
+    /**
+     * Read a comparable CBOR array.
+     *
+     * @return array{type: string, value: list<array<string, mixed>>}
+     */
+    private function readComparableArray(int $info): array
+    {
+        if (++$this->depth > self::MAX_DEPTH) {
+            $this->malformed();
+        }
+
+        $indefinite = $info === self::INFO_INDEFINITE;
+        $remaining = $indefinite
+            ? -1
+            : $this->readLengthFromInfo($info);
+        $values = [];
+
+        while (true) {
+            if ($indefinite && $this->consumeBreak()) {
+                break;
+            }
+            if (!$indefinite && $remaining-- <= 0) {
+                break;
+            }
+            $values[] = $this->readComparableValue();
+        }
+
+        $this->depth--;
+
+        return [
+            'type' => 'array',
+            'value' => $values
+        ];
+    }
+
+    /**
+     * Read a comparable CBOR map with deterministically ordered entries.
+     *
+     * @return array{
+     *     type: string,
+     *     value: list<array{
+     *         key: array<string, mixed>,
+     *         value: array<string, mixed>
+     *     }>
+     * }
+     */
+    private function readComparableMap(int $info): array
+    {
+        if (++$this->depth > self::MAX_DEPTH) {
+            $this->malformed();
+        }
+
+        $indefinite = $info === self::INFO_INDEFINITE;
+        $remaining = $indefinite
+            ? -1
+            : $this->readLengthFromInfo($info);
+        $entries = [];
+
+        while (true) {
+            if ($indefinite && $this->consumeBreak()) {
+                break;
+            }
+            if (!$indefinite && $remaining-- <= 0) {
+                break;
+            }
+            $entries[] = [
+                'key' => $this->readComparableValue(),
+                'value' => $this->readComparableValue()
+            ];
+        }
+
+        $this->depth--;
+        \usort(
+            $entries,
+            static fn(array $left, array $right): int => \strcmp(
+                \serialize($left),
+                \serialize($right)
+            )
+        );
+
+        return [
+            'type' => 'map',
+            'value' => $entries
+        ];
+    }
+
+    /**
+     * Read a comparable tagged value.
+     *
+     * @return array<string, mixed>
+     */
+    private function readComparableTag(int $info): array
+    {
+        $tag = $this->readLengthFromInfo($info);
+        if (++$this->depth > self::MAX_DEPTH) {
+            $this->malformed();
+        }
+        $value = $this->readComparableValue();
+        $this->depth--;
+        if ($tag === self::TAG_EPOCH
+            && ($value['type'] ?? null) === 'integer'
+            && \sprintf('%.0f', (float) $value['value'])
+                === (string) $value['value']
+        ) {
+            $value = [
+                'type' => 'float',
+                'value' => (float) $value['value']
+            ];
+        }
+
+        return [
+            'type' => 'tag',
+            'tag' => $tag,
+            'value' => $value
+        ];
+    }
+
+    /**
+     * Read a comparable CBOR simple or floating-point value.
+     *
+     * @return array<string, mixed>
+     */
+    private function readComparableSimple(int $info): array
+    {
+        if ($info < self::SIMPLE_FALSE) {
+            return [
+                'type' => 'simple',
+                'value' => $info
+            ];
+        }
+
+        return match ($info) {
+            self::SIMPLE_FALSE => [
+                'type' => 'boolean',
+                'value' => false
+            ],
+            self::SIMPLE_TRUE => [
+                'type' => 'boolean',
+                'value' => true
+            ],
+            self::SIMPLE_NULL => ['type' => 'null'],
+            self::SIMPLE_UNDEFINED => ['type' => 'undefined'],
+            self::INFO_ONE_BYTE => [
+                'type' => 'simple',
+                'value' => $this->readLengthFromInfo($info)
+            ],
+            self::SIMPLE_HALF_FLOAT,
+            self::SIMPLE_FLOAT,
+            self::SIMPLE_DOUBLE => [
+                'type' => 'float',
+                'value' => $this->normalizeComparableFloat(
+                    $this->readFloatFromInfo($info)
+                )
+            ],
+            default => $this->malformed()
+        };
+    }
+
+    private function normalizeComparableFloat(float $value): float|string
+    {
+        if (\is_nan($value)) {
+            return 'NaN';
+        }
+        if (\is_infinite($value)) {
+            return $value > 0 ? 'Infinity' : '-Infinity';
+        }
+        if ($value === 0.0
+            && (\ord(\pack('E', $value)[0]) & 0x80) !== 0
+        ) {
+            return '-0';
+        }
+
+        return $value;
     }
 
     /**
