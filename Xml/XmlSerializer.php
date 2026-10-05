@@ -29,6 +29,17 @@ use Smithy\Core\Shape\UnionInterface;
  */
 final class XmlSerializer implements ShapeSerializerInterface
 {
+    private const STRING_ESCAPE_MAP = [
+        '&' => '&amp;',
+        '<' => '&lt;',
+        '>' => '&gt;',
+        '"' => '&quot;',
+        "\r" => '&#xD;',
+        "\n" => '&#xA;',
+        "\u{0085}" => '&#x85;',
+        "\u{2028}" => '&#x2028;',
+    ];
+
     private readonly XmlCodecSettings $settings;
     private readonly bool $honorTimestampFormatTrait;
     /** @var array<int, string> memberIndex -> XML wire name */
@@ -176,17 +187,17 @@ final class XmlSerializer implements ShapeSerializerInterface
         // String members are the only scalar path that can carry a member namespace.
         $ct = $this->memberComponentTypes[$idx];
         if ($ct === XmlSchemaExtension::COMPONENT_ELEMENT) {
-            $this->writer->writeElement($this->wireNames[$idx], $value);
+            $this->writeStringElement($this->wireNames[$idx], $value);
             return;
         }
         if ($ct === XmlSchemaExtension::COMPONENT_ATTRIBUTE) {
-            $this->writer->writeAttribute($this->wireNames[$idx], $value);
+            $this->writeStringAttribute($this->wireNames[$idx], $value);
             return;
         }
         $ns = $this->nsAttrs[$idx];
         $this->writer->startElement($this->wireNames[$idx]);
         $this->writer->writeAttribute($ns[0], $ns[1]);
-        $this->writer->text($value);
+        $this->writeStringText($value);
         $this->writer->endElement();
     }
 
@@ -383,10 +394,10 @@ final class XmlSerializer implements ShapeSerializerInterface
                     $keyNsPrefix ? "xmlns:{$keyNsPrefix}" : 'xmlns',
                     $keyNsUri
                 );
-                $this->writer->text((string) $key);
+                $this->writeStringText((string) $key);
                 $this->writer->endElement();
             } else {
-                $this->writer->writeElement($keyName, (string) $key);
+                $this->writeStringElement($keyName, (string) $key);
             }
 
             $this->writer->startElement($valueName);
@@ -399,7 +410,7 @@ final class XmlSerializer implements ShapeSerializerInterface
             if ($mapValue !== null && $valueType !== null) {
                 $this->writeScalarOrNested($mapValue, $value, $valueType);
             } else {
-                $this->writer->text((string) $value);
+                $this->writeStringText((string) $value);
             }
             $this->writer->endElement();
             $this->writer->endElement();
@@ -476,7 +487,10 @@ final class XmlSerializer implements ShapeSerializerInterface
                         continue;
                     }
 
-                    $this->writer->writeAttribute($xmlName, (string) $value);
+                    $this->writeStringAttribute(
+                        $xmlName,
+                        (string) $value
+                    );
                 }
             }
             foreach ($info->elementMembers as $ms) {
@@ -593,7 +607,7 @@ final class XmlSerializer implements ShapeSerializerInterface
             $this->nsAttrs = $prevNsAttrs;
             $this->tsFormats = $prevTsFormats;
         } else {
-            $this->writer->writeElement((string) $tag, (string) $value);
+            $this->writeStringElement((string) $tag, (string) $value);
         }
 
         $this->writer->endElement();
@@ -632,6 +646,107 @@ final class XmlSerializer implements ShapeSerializerInterface
         return $this->writer->outputMemory();
     }
 
+    private static function escapeText(string $value): string
+    {
+        if (\preg_match('//u', $value) !== 1) {
+            return \htmlspecialchars(
+                $value,
+                \ENT_XML1 | \ENT_COMPAT,
+                'UTF-8'
+            );
+        }
+
+        return \strtr($value, self::STRING_ESCAPE_MAP);
+    }
+
+    private static function escapeAttribute(string $value): string
+    {
+        $escaped = \strtr($value, self::STRING_ESCAPE_MAP);
+
+        return \preg_replace_callback(
+            '/[^\x20-\x7E]/u',
+            static function (array $matches): string {
+                $codepoint = self::utf8Codepoint($matches[0]);
+                if ($codepoint === 9) {
+                    return '&#9;';
+                }
+
+                return '&#x'
+                    . \strtoupper(\dechex($codepoint))
+                    . ';';
+            },
+            $escaped
+        ) ?? $escaped;
+    }
+
+    private static function utf8Codepoint(string $character): int
+    {
+        /** @var array<int, int> $bytes */
+        $bytes = \unpack('C*', $character);
+        $first = $bytes[1];
+
+        return match (\count($bytes)) {
+            1 => $first,
+            2 => (($first & 0x1F) << 6)
+                | ($bytes[2] & 0x3F),
+            3 => (($first & 0x0F) << 12)
+                | (($bytes[2] & 0x3F) << 6)
+                | ($bytes[3] & 0x3F),
+            4 => (($first & 0x07) << 18)
+                | (($bytes[2] & 0x3F) << 12)
+                | (($bytes[3] & 0x3F) << 6)
+                | ($bytes[4] & 0x3F),
+            default => throw new \LogicException(
+                'Invalid UTF-8 character while escaping XML.'
+            ),
+        };
+    }
+
+    private static function containsEndOfLine(string $value): bool
+    {
+        return \str_contains($value, "\n")
+            || \str_contains($value, "\r")
+            || \str_contains($value, "\u{0085}")
+            || \str_contains($value, "\u{2028}");
+    }
+
+    private function writeStringText(string $value): void
+    {
+        if (!self::containsEndOfLine($value)) {
+            $this->writer->text($value);
+
+            return;
+        }
+
+        $this->writer->writeRaw(self::escapeText($value));
+    }
+
+    private function writeStringElement(string $name, string $value): void
+    {
+        if (!self::containsEndOfLine($value)) {
+            $this->writer->writeElement($name, $value);
+
+            return;
+        }
+
+        $this->writer->startElement($name);
+        $this->writer->writeRaw(self::escapeText($value));
+        $this->writer->endElement();
+    }
+
+    private function writeStringAttribute(string $name, string $value): void
+    {
+        if (!self::containsEndOfLine($value)) {
+            $this->writer->writeAttribute($name, $value);
+
+            return;
+        }
+
+        $this->writer->startAttribute($name);
+        $this->writer->writeRaw(self::escapeAttribute($value));
+        $this->writer->endAttribute();
+    }
+
     /**
      * Return the owned writer to the codec pool once the serializer is done.
      *
@@ -664,14 +779,14 @@ final class XmlSerializer implements ShapeSerializerInterface
     {
         if ($nsUri === null) {
             foreach ($list as $item) {
-                $this->writer->writeElement($itemName, (string) $item);
+                $this->writeStringElement($itemName, (string) $item);
             }
         } else {
             $nsAttr = $nsPrefix ? "xmlns:{$nsPrefix}" : 'xmlns';
             foreach ($list as $item) {
                 $this->writer->startElement($itemName);
                 $this->writer->writeAttribute($nsAttr, $nsUri);
-                $this->writer->text((string) $item);
+                $this->writeStringText((string) $item);
                 $this->writer->endElement();
             }
         }
@@ -1119,14 +1234,14 @@ final class XmlSerializer implements ShapeSerializerInterface
                 );
                 return;
             case ShapeType::Enum->value:
-                $this->writer->text(
+                $this->writeStringText(
                     $value instanceof EnumInterface
                         ? (string) $value->getValue()
                         : (string) $value
                 );
                 return;
             default:
-                $this->writer->text((string) $value);
+                $this->writeStringText((string) $value);
                 return;
         }
     }
@@ -1193,7 +1308,7 @@ final class XmlSerializer implements ShapeSerializerInterface
                     $listMember->type
                 );
             } else {
-                $this->writer->text((string) $item);
+                $this->writeStringText((string) $item);
             }
             $this->writer->endElement();
         }
@@ -1220,12 +1335,12 @@ final class XmlSerializer implements ShapeSerializerInterface
 
         foreach ($map as $key => $value) {
             $this->writer->startElement('entry');
-            $this->writer->writeElement($keyName, (string) $key);
+            $this->writeStringElement($keyName, (string) $key);
             $this->writer->startElement($valueName);
             if ($mapValue !== null) {
                 $this->writeScalarOrNested($mapValue, $value, $mapValue->type);
             } else {
-                $this->writer->text((string) $value);
+                $this->writeStringText((string) $value);
             }
             $this->writer->endElement();
             $this->writer->endElement();
