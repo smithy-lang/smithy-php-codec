@@ -70,6 +70,10 @@ PHP JSON extension. The CBOR codec uses a PHP implementation.
 
 This package depends on `smithy/core` and `psr/http-message`.
 
+## Design
+
+See [Codec Design](../../docs/design/codec/serialization-codecs.md).
+
 ## Contributing
 
 Run the component tests from the monorepo root:
