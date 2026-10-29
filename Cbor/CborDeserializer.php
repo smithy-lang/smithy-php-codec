@@ -1412,12 +1412,15 @@ final class CborDeserializer implements ShapeDeserializerInterface
             $this->malformed();
         }
 
-        $bytesInfo = $this->readInitialByte() & 0x1F;
+        $bytesInitial = $this->readInitialByte();
+        if (($bytesInitial >> 5) !== self::MAJOR_BYTESTRING) {
+            $this->malformed();
+        }
+
         // BigInteger tags carry raw byte strings.
         $value = CborBigNumber::fromUnsignedBytes(
-            $bytesInfo < self::INFO_ONE_BYTE
-                ? $this->readBytes($bytesInfo)
-                : $this->readStringPayload($bytesInfo)
+            $this->readBigIntegerBytes($bytesInitial & 0x1F),
+            $this->settings->maxBigIntegerBytes
         );
 
         if ($info === self::TAG_NEG_BIGINT) {
@@ -1425,6 +1428,45 @@ final class CborDeserializer implements ShapeDeserializerInterface
         }
 
         return new BigInteger($value);
+    }
+
+    /**
+     * Read a bounded CBOR bignum byte string.
+     */
+    private function readBigIntegerBytes(int $info): string
+    {
+        $maxBytes = $this->settings->maxBigIntegerBytes;
+        if ($info !== self::INFO_INDEFINITE) {
+            $length = $this->readLengthFromInfo($info);
+            if ($length > $maxBytes) {
+                $this->malformed();
+            }
+
+            return $this->readBytes($length);
+        }
+
+        $chunks = [];
+        $length = 0;
+        while (!$this->consumeBreak()) {
+            $initial = $this->readInitialByte();
+            $chunkInfo = $initial & 0x1F;
+            if (($initial >> 5) !== self::MAJOR_BYTESTRING
+                || $chunkInfo === self::INFO_INDEFINITE
+            ) {
+                $this->malformed();
+            }
+
+            $chunkLength = $this->readLengthFromInfo($chunkInfo);
+            if ($chunkLength > $maxBytes - $length) {
+                $this->malformed();
+            }
+            if ($chunkLength > 0) {
+                $chunks[] = $this->readBytes($chunkLength);
+            }
+            $length += $chunkLength;
+        }
+
+        return \implode('', $chunks);
     }
 
     /**

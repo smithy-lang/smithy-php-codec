@@ -64,7 +64,9 @@ formats, wrapper elements, and trait handling. Pass settings to the matching
 codec constructor.
 
 The XML codec requires the XMLWriter and SimpleXML extensions. JSON uses the
-PHP JSON extension. The CBOR codec uses a PHP implementation.
+PHP JSON extension. The CBOR codec uses a PHP implementation and limits
+decoded bignum payloads to 1,024 bytes by default. Configure
+`CborCodecSettings::maxBigIntegerBytes` when a model requires larger values.
 
 ## Dependencies
 

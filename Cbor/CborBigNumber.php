@@ -5,24 +5,87 @@ declare(strict_types=1);
 namespace Smithy\Codec\Cbor;
 
 /**
- * Decimal-string arithmetic used by uncommon CBOR bignum payloads.
+ * Convert bounded CBOR bignum payloads to decimal strings.
  */
 final class CborBigNumber
 {
     /**
-     * Convert big-endian bytes into an unsigned decimal string.
+     * Default maximum accepted CBOR bignum magnitude length.
      */
-    public static function fromUnsignedBytes(string $bytes): string
-    {
-        $result = '0';
-        $length = \strlen($bytes);
+    public const DEFAULT_MAX_BYTES = 1024;
 
-        for ($i = 0; $i < $length; $i++) {
-            $result = self::multiplyBySmall($result, 256);
-            $result = self::addSmall($result, \ord($bytes[$i]));
+    private const INPUT_CHUNK_BYTES = 3;
+    private const LIMB_BASE = 1_000_000_000;
+    private const LIMB_DIGITS = 9;
+
+    /**
+     * Convert big-endian bytes into an unsigned decimal string.
+     *
+     * @param int<1, max> $maxBytes Maximum accepted payload length.
+     *
+     * @throws \InvalidArgumentException When the maximum is less than one.
+     * @throws \LengthException When the payload exceeds the maximum.
+     */
+    public static function fromUnsignedBytes(
+        string $bytes,
+        int $maxBytes = self::DEFAULT_MAX_BYTES
+    ): string
+    {
+        if ($maxBytes < 1) {
+            throw new \InvalidArgumentException(
+                'The maximum CBOR bignum length must be at least one byte.'
+            );
         }
 
-        return $result;
+        $length = \strlen($bytes);
+        if ($length > $maxBytes) {
+            throw new \LengthException(
+                "CBOR bignum payload exceeds {$maxBytes} bytes."
+            );
+        }
+        if ($length === 0) {
+            return '0';
+        }
+
+        $limbs = [0];
+        $offset = 0;
+        while ($offset < $length) {
+            $chunkLength = \min(
+                self::INPUT_CHUNK_BYTES,
+                $length - $offset
+            );
+            $factor = 1;
+            $carry = 0;
+            for ($i = 0; $i < $chunkLength; $i++) {
+                $factor *= 256;
+                $carry = ($carry * 256) + \ord($bytes[$offset]);
+                $offset++;
+            }
+
+            $limbCount = \count($limbs);
+            for ($i = 0; $i < $limbCount; $i++) {
+                $value = ($limbs[$i] * $factor) + $carry;
+                $limbs[$i] = $value % self::LIMB_BASE;
+                $carry = \intdiv($value, self::LIMB_BASE);
+            }
+            while ($carry !== 0) {
+                $limbs[] = $carry % self::LIMB_BASE;
+                $carry = \intdiv($carry, self::LIMB_BASE);
+            }
+        }
+
+        $last = \count($limbs) - 1;
+        $parts = [(string) $limbs[$last]];
+        for ($i = $last - 1; $i >= 0; $i--) {
+            $parts[] = \str_pad(
+                (string) $limbs[$i],
+                self::LIMB_DIGITS,
+                '0',
+                STR_PAD_LEFT
+            );
+        }
+
+        return \implode('', $parts);
     }
 
     /**
@@ -30,64 +93,19 @@ final class CborBigNumber
      */
     public static function increment(string $value): string
     {
-        $carry = 1;
-        $result = '';
+        if ($value === '') {
+            return '1';
+        }
+
         for ($i = \strlen($value) - 1; $i >= 0; $i--) {
-            $digit = (\ord($value[$i]) - 48) + $carry;
-            if ($digit >= 10) {
-                $digit -= 10;
-                $carry = 1;
-            } else {
-                $carry = 0;
+            if ($value[$i] !== '9') {
+                $value[$i] = \chr(\ord($value[$i]) + 1);
+
+                return $value;
             }
-            $result = \chr(48 + $digit) . $result;
-        }
-        if ($carry !== 0) {
-            $result = '1' . $result;
+            $value[$i] = '0';
         }
 
-        return $result;
-    }
-
-    private static function multiplyBySmall(string $value, int $factor): string
-    {
-        if ($value === '0') {
-            return '0';
-        }
-
-        $carry = 0;
-        $result = '';
-        for ($i = \strlen($value) - 1; $i >= 0; $i--) {
-            $product = ((\ord($value[$i]) - 48) * $factor) + $carry;
-            $result = \chr(48 + ($product % 10)) . $result;
-            $carry = \intdiv($product, 10);
-        }
-        while ($carry !== 0) {
-            $result = \chr(48 + ($carry % 10)) . $result;
-            $carry = \intdiv($carry, 10);
-        }
-
-        return $result;
-    }
-
-    private static function addSmall(string $value, int $addend): string
-    {
-        $carry = $addend;
-        $result = '';
-        for ($i = \strlen($value) - 1; $i >= 0; $i--) {
-            $sum = (\ord($value[$i]) - 48) + ($carry % 10);
-            $carry = \intdiv($carry, 10);
-            if ($sum >= 10) {
-                $sum -= 10;
-                $carry++;
-            }
-            $result = \chr(48 + $sum) . $result;
-        }
-        while ($carry !== 0) {
-            $result = \chr(48 + ($carry % 10)) . $result;
-            $carry = \intdiv($carry, 10);
-        }
-
-        return \ltrim($result, '0') ?: '0';
+        return '1' . $value;
     }
 }
