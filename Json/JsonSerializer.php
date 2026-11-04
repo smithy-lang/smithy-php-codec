@@ -22,6 +22,7 @@ final class JsonSerializer implements ShapeSerializerInterface
 {
     private readonly JsonCodecSettings $settings;
     private readonly bool $honorTimestampFormatTrait;
+    private readonly bool $useStringForArbitraryPrecision;
     /**
      * Root output for the current payload.
      */
@@ -73,6 +74,8 @@ final class JsonSerializer implements ShapeSerializerInterface
         $this->settings = $settings ?? new JsonCodecSettings();
         $this->honorTimestampFormatTrait =
             $this->settings->honorTimestampFormatTrait;
+        $this->useStringForArbitraryPrecision =
+            $this->settings->useStringForArbitraryPrecision;
     }
 
     /**
@@ -119,8 +122,7 @@ final class JsonSerializer implements ShapeSerializerInterface
      */
     public function serializeBigInteger(Schema $schema, BigInteger $value, int $idx): void
     {
-        // Emit via a token that flush() unwraps to a raw JSON number.
-        $this->emit($this->wrapBigIntegerToken($value), $idx);
+        $this->emit($this->renderBigInteger($value), $idx);
     }
 
     /**
@@ -130,7 +132,7 @@ final class JsonSerializer implements ShapeSerializerInterface
      */
     public function serializeBigDecimal(Schema $schema, BigDecimal $value, int $idx): void
     {
-        $this->emit($this->wrapBigDecimalToken($value), $idx);
+        $this->emit($this->renderBigDecimal($value), $idx);
     }
 
     /**
@@ -312,7 +314,9 @@ final class JsonSerializer implements ShapeSerializerInterface
 
         // Capture the top-level big-number flag once.
         if ($this->frameStack === []) {
-            $this->rootHasBigNumber = $info?->hasBigNumber ?? false;
+            $this->rootHasBigNumber =
+                !$this->useStringForArbitraryPrecision
+                && ($info?->hasBigNumber ?? false);
         }
 
         // Save the parent frame before rebinding `$current`.
@@ -738,10 +742,10 @@ final class JsonSerializer implements ShapeSerializerInterface
                 return \base64_encode($value);
 
             case ShapeType::BigInteger->value:
-                return $this->wrapBigIntegerToken($value);
+                return $this->renderBigInteger($value);
 
             case ShapeType::BigDecimal->value:
-                return $this->wrapBigDecimalToken($value);
+                return $this->renderBigDecimal($value);
 
             case ShapeType::Timestamp->value:
                 if ($context instanceof Schema) {
@@ -799,30 +803,27 @@ final class JsonSerializer implements ShapeSerializerInterface
         return $encoded;
     }
 
-    /**
-     * Wrap a big-integer value for raw JSON-number emission.
-     */
-    private function wrapBigIntegerToken(mixed $value): BigNumberToken
+    private function renderBigInteger(mixed $value): string|BigNumberToken
     {
         $number = $value instanceof BigInteger
             ? $value->value
             : (string) $value;
+        $number = self::normalizeBigIntegerDigits($number);
 
-        return $this->wrapBigNumberToken(
-            self::normalizeBigIntegerDigits($number)
-        );
+        return $this->useStringForArbitraryPrecision
+            ? $number
+            : $this->wrapBigNumberToken($number);
     }
 
-    /**
-     * Wrap a big-decimal value for raw JSON-number emission.
-     */
-    private function wrapBigDecimalToken(mixed $value): BigNumberToken
+    private function renderBigDecimal(mixed $value): string|BigNumberToken
     {
         $number = $value instanceof BigDecimal
             ? $value->value
             : (string) $value;
 
-        return $this->wrapBigNumberToken($number);
+        return $this->useStringForArbitraryPrecision
+            ? $number
+            : $this->wrapBigNumberToken($number);
     }
 
     /**
