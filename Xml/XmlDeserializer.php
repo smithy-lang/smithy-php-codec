@@ -286,8 +286,8 @@ final class XmlDeserializer implements ShapeDeserializerInterface
         static $extKey = null;
         $extKey ??= XmlSchemaExtensionProvider::key();
 
+        $info = $info ?? $schema->getExtension($extKey);
         /** @var XmlSchemaExtension $info */
-        $info ??= $schema->getExtension($extKey);
 
         $listMember = $info->listMemberSchema;
         $memberName = $info->listMemberName ?? 'member';
@@ -409,8 +409,8 @@ final class XmlDeserializer implements ShapeDeserializerInterface
         static $extKey = null;
         $extKey ??= XmlSchemaExtensionProvider::key();
 
+        $info = $info ?? $schema->getExtension($extKey);
         /** @var XmlSchemaExtension $info */
-        $info ??= $schema->getExtension($extKey);
 
         $mapValue = $info->mapValueSchema;
         $keyName = $info->mapKeyName;

@@ -111,13 +111,13 @@ final class JsonSerializer implements ShapeSerializerInterface
     public function serializeFloat(Schema $schema, float $value, int $idx): void
     {
         // JSON renders non-finite floats as Smithy sentinel strings.
-        $s = match ($str = (string) $value) {
+        $value = match ((string) $value) {
             'NAN'  => 'NaN',
             'INF'  => 'Infinity',
             '-INF' => '-Infinity',
-            default => null,
+            default => $value,
         };
-        $this->emit($s ?? $value, $idx);
+        $this->emit($value, $idx);
     }
 
     /**
