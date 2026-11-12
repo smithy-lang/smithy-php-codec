@@ -37,7 +37,8 @@ final class XmlDeserializer implements ShapeDeserializerInterface
     public function __construct(
         private \SimpleXMLElement $element,
         ?XmlCodecSettings $settings = null
-    ) {
+    )
+    {
         $this->settings = $settings ?? new XmlCodecSettings();
         $this->honorTimestampFormatTrait =
             $this->settings->honorTimestampFormatTrait;
@@ -88,7 +89,15 @@ final class XmlDeserializer implements ShapeDeserializerInterface
             if ($attrs !== null) {
                 foreach ($info->attributeDeserMembers as $entry) {
                     $attrName = $entry[0];
-                    $attrValue = $attrs->{$attrName};
+                    $colon = \strpos($attrName, ':');
+                    if ($colon === false) {
+                        $attrValue = $attrs->{$attrName};
+                    } else {
+                        $prefix = \substr($attrName, 0, $colon);
+                        $localName = \substr($attrName, $colon + 1);
+                        $attrValue = $element
+                            ->attributes($prefix, true)->{$localName};
+                    }
                     if ($attrValue !== null) {
                         $value = (string) $attrValue;
                         $idx = $entry[1];
