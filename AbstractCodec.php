@@ -54,4 +54,26 @@ abstract class AbstractCodec
     abstract public function createDeserializer(
         StreamInterface $source
     ): ShapeDeserializerInterface;
+
+    /**
+     * Borrow a serializer that the caller returns with {@see releaseSerializer()}.
+     *
+     * Codecs that pool serializers override this. The default creates a fresh
+     * serializer.
+     *
+     * @internal
+     */
+    public function acquireSerializer(): ShapeSerializerInterface
+    {
+        return $this->createSerializer();
+    }
+
+    /**
+     * Return a serializer borrowed with {@see acquireSerializer()}.
+     *
+     * @internal
+     *
+     * @return void
+     */
+    public function releaseSerializer(ShapeSerializerInterface $serializer): void {}
 }

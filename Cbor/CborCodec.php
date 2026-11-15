@@ -84,8 +84,12 @@ final class CborCodec extends AbstractCodec
      *
      * @return void
      */
-    public function releaseSerializer(CborSerializer $serializer): void
+    public function releaseSerializer(ShapeSerializerInterface $serializer): void
     {
+        if (!$serializer instanceof CborSerializer) {
+            return;
+        }
+
         $serializer->reset();
         $this->serializerPool[] = $serializer;
     }

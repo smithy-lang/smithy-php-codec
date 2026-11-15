@@ -81,10 +81,12 @@ final class FormUrlEncodedCodec extends AbstractCodec
      *
      * @return void
      */
-    public function releaseSerializer(
-        FormUrlEncodedSerializer $serializer
-    ): void
+    public function releaseSerializer(ShapeSerializerInterface $serializer): void
     {
+        if (!$serializer instanceof FormUrlEncodedSerializer) {
+            return;
+        }
+
         $serializer->reset();
         $this->serializerPool[] = $serializer;
     }

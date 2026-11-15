@@ -81,8 +81,12 @@ final class JsonCodec extends AbstractCodec
      *
      * @return void
      */
-    public function releaseSerializer(JsonSerializer $serializer): void
+    public function releaseSerializer(ShapeSerializerInterface $serializer): void
     {
+        if (!$serializer instanceof JsonSerializer) {
+            return;
+        }
+
         $serializer->reset();
         $this->serializerPool[] = $serializer;
     }
