@@ -235,15 +235,10 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
      *
      * @return void
      */
-    public function serializeTimestamp(
-        Schema $schema,
-        float $value,
-        int $idx,
-        ?TimestampFormat $format = null
-    ): void
+    public function serializeTimestamp(Schema $schema, float $value, int $idx): void
     {
         $fmt = ($this->honorTimestampFormatTrait
-            ? ($this->tsFormats[$idx] ?? $format)
+            ? $this->tsFormats[$idx] ?? null
             : null
         ) ?? $this->settings->defaultTimestampFormat;
         $this->buffer .= $this->prefix

@@ -186,12 +186,12 @@ final class CborSerializer implements ShapeSerializerInterface
 
         if ($negative) {
             $this->buffer .= self::TOKEN_TAG_NEG_BIGINT;
-            $digits = $this->decrementUnsignedDecimalString($digits);
+            $digits = CborBigNumber::decrement($digits);
         } else {
             $this->buffer .= self::TOKEN_TAG_POS_BIGINT;
         }
 
-        $value = $this->unsignedDecimalStringToBytes($digits);
+        $value = CborBigNumber::toUnsignedBytes($digits);
         $length = \strlen($value);
         if ($length < 24) {
             $this->buffer .= \chr(0x40 | $length) . $value;
@@ -271,7 +271,7 @@ final class CborSerializer implements ShapeSerializerInterface
             $mantissa = $negative ? '-' . $mantissaDigits : $mantissaDigits;
         }
 
-        $adjustedExponent = $this->subtractSmallFromSignedDecimalString(
+        $adjustedExponent = CborBigNumber::subtractSmall(
             $explicitExponent,
             $fractionLength
         );
@@ -293,14 +293,14 @@ final class CborSerializer implements ShapeSerializerInterface
                 if ($adjustedExponentNegative) {
                     $this->buffer .= self::TOKEN_TAG_NEG_BIGINT;
                     $adjustedExponentDigits =
-                        $this->decrementUnsignedDecimalString(
+                        CborBigNumber::decrement(
                             $adjustedExponentDigits
                         );
                 } else {
                     $this->buffer .= self::TOKEN_TAG_POS_BIGINT;
                 }
 
-                $adjustedExponentValue = $this->unsignedDecimalStringToBytes(
+                $adjustedExponentValue = CborBigNumber::toUnsignedBytes(
                     $adjustedExponentDigits
                 );
                 $adjustedExponentLength = \strlen($adjustedExponentValue);
@@ -358,12 +358,12 @@ final class CborSerializer implements ShapeSerializerInterface
         if ($mantissaNegative) {
             $this->buffer .= self::TOKEN_TAG_NEG_BIGINT;
             $mantissaDigits =
-                $this->decrementUnsignedDecimalString($mantissaDigits);
+                CborBigNumber::decrement($mantissaDigits);
         } else {
             $this->buffer .= self::TOKEN_TAG_POS_BIGINT;
         }
 
-        $mantissaValue = $this->unsignedDecimalStringToBytes($mantissaDigits);
+        $mantissaValue = CborBigNumber::toUnsignedBytes($mantissaDigits);
         $mantissaLength = \strlen($mantissaValue);
         if ($mantissaLength < 24) {
             $this->buffer .= \chr(0x40 | $mantissaLength) . $mantissaValue;
@@ -442,13 +442,10 @@ final class CborSerializer implements ShapeSerializerInterface
      *
      * @return void
      */
-    public function serializeTimestamp(
-        Schema $schema,
-        float $value,
-        int $idx,
-        ?TimestampFormat $format = null
-    ): void
+    public function serializeTimestamp(Schema $schema, float $value, int $idx): void
     {
+        static $extKey = null;
+        $extKey ??= CborSchemaExtensionProvider::key();
         $table = $this->currentFieldNameTable;
         if ($table !== null) {
             $this->buffer .= $table[$idx]
@@ -458,10 +455,9 @@ final class CborSerializer implements ShapeSerializerInterface
             }
         }
 
+        // Use the format the extension resolved from the trait once.
         $resolved = ($this->honorTimestampFormatTrait
-            ? ($format ?? TimestampFormat::fromTraitString(
-                $schema->getTrait(Schema::T_TIMESTAMP_FORMAT)
-            ))
+            ? $schema->getExtension($extKey)?->timestampFormat
             : null
         ) ?? $this->settings->defaultTimestampFormat;
         if ($resolved !== TimestampFormat::EpochSeconds) {
@@ -713,12 +709,12 @@ final class CborSerializer implements ShapeSerializerInterface
 
                 if ($negative) {
                     $this->buffer .= self::TOKEN_TAG_NEG_BIGINT;
-                    $digits = $this->decrementUnsignedDecimalString($digits);
+                    $digits = CborBigNumber::decrement($digits);
                 } else {
                     $this->buffer .= self::TOKEN_TAG_POS_BIGINT;
                 }
 
-                $value = $this->unsignedDecimalStringToBytes($digits);
+                $value = CborBigNumber::toUnsignedBytes($digits);
                 $length = \strlen($value);
                 if ($length < 24) {
                     $this->buffer .= \chr(0x40 | $length) . $value;
@@ -792,7 +788,7 @@ final class CborSerializer implements ShapeSerializerInterface
                         : $mantissaDigits;
                 }
 
-                $adjustedExponent = $this->subtractSmallFromSignedDecimalString(
+                $adjustedExponent = CborBigNumber::subtractSmall(
                     $explicitExponent,
                     $fractionLength
                 );
@@ -817,7 +813,7 @@ final class CborSerializer implements ShapeSerializerInterface
                         if ($adjustedExponentNegative) {
                             $this->buffer .= self::TOKEN_TAG_NEG_BIGINT;
                             $adjustedExponentDigits =
-                                $this->decrementUnsignedDecimalString(
+                                CborBigNumber::decrement(
                                     $adjustedExponentDigits
                                 );
                         } else {
@@ -825,7 +821,7 @@ final class CborSerializer implements ShapeSerializerInterface
                         }
 
                         $adjustedExponentValue =
-                            $this->unsignedDecimalStringToBytes(
+                            CborBigNumber::toUnsignedBytes(
                                 $adjustedExponentDigits
                             );
                         $adjustedExponentLength = \strlen(
@@ -887,14 +883,14 @@ final class CborSerializer implements ShapeSerializerInterface
 
                 if ($mantissaNegative) {
                     $this->buffer .= self::TOKEN_TAG_NEG_BIGINT;
-                    $mantissaDigits = $this->decrementUnsignedDecimalString(
+                    $mantissaDigits = CborBigNumber::decrement(
                         $mantissaDigits
                     );
                 } else {
                     $this->buffer .= self::TOKEN_TAG_POS_BIGINT;
                 }
 
-                $mantissaValue = $this->unsignedDecimalStringToBytes(
+                $mantissaValue = CborBigNumber::toUnsignedBytes(
                     $mantissaDigits
                 );
                 $mantissaLength = \strlen($mantissaValue);
@@ -1009,9 +1005,9 @@ final class CborSerializer implements ShapeSerializerInterface
                 }
                 $value = (float) $value;
                 $resolved = ($this->honorTimestampFormatTrait
-                    ? TimestampFormat::fromTraitString(
-                        $schema->getTrait(Schema::T_TIMESTAMP_FORMAT)
-                    )
+                    ? $schema->getExtension(
+                        CborSchemaExtensionProvider::key()
+                    )?->timestampFormat
                     : null
                 ) ?? $this->settings->defaultTimestampFormat;
                 if ($resolved !== TimestampFormat::EpochSeconds) {
@@ -2113,168 +2109,4 @@ final class CborSerializer implements ShapeSerializerInterface
 
         return \strcmp($digits, $limit) <= 0;
     }
-
-    /**
-     * Subtract one from an unsigned decimal string.
-     */
-    private function decrementUnsignedDecimalString(string $digits): string
-    {
-        $chars = \str_split($digits);
-        for ($i = \count($chars) - 1; $i >= 0; $i--) {
-            if ($chars[$i] !== '0') {
-                $chars[$i] = \chr(\ord($chars[$i]) - 1);
-                break;
-            }
-            $chars[$i] = '9';
-        }
-
-        $result = \ltrim(\implode('', $chars), '0');
-        return $result === '' ? '0' : $result;
-    }
-
-    /**
-     * Convert an unsigned decimal string to big-endian bytes.
-     */
-    private function unsignedDecimalStringToBytes(string $digits): string
-    {
-        if ($digits === '0') {
-            return "\x00";
-        }
-
-        $bytes = '';
-        while ($digits !== '0') {
-            $quotient = '';
-            $remainder = 0;
-            $length = \strlen($digits);
-            for ($i = 0; $i < $length; $i++) {
-                $value = ($remainder * 10) + (\ord($digits[$i]) - 48);
-                $digit = \intdiv($value, 256);
-                if ($quotient !== '' || $digit !== 0) {
-                    $quotient .= \chr(48 + $digit);
-                }
-                $remainder = $value - ($digit * 256);
-            }
-
-            $bytes = \chr($remainder) . $bytes;
-            $digits = $quotient === '' ? '0' : $quotient;
-        }
-
-        return $bytes;
-    }
-
-    /**
-     * Subtract a small integer from a signed decimal string.
-     */
-    private function subtractSmallFromSignedDecimalString(string $value, int $delta): string
-    {
-        if ($delta === 0) {
-            return $value;
-        }
-
-        $negative = $value !== '' && $value[0] === '-';
-        $digits = $negative ? \substr($value, 1) : $value;
-        $digits = \ltrim($digits, '0');
-        if ($digits === '') {
-            return (string) -$delta;
-        }
-
-        $deltaString = (string) $delta;
-        if ($negative) {
-            return '-'
-                . $this->addUnsignedDecimalStrings($digits, $deltaString);
-        }
-
-        $comparison = $this->compareUnsignedDecimalStrings(
-            $digits,
-            $deltaString
-        );
-        if ($comparison === 0) {
-            return '0';
-        }
-        if ($comparison > 0) {
-            return $this->subtractUnsignedDecimalStrings($digits, $deltaString);
-        }
-
-        return '-'
-            . $this->subtractUnsignedDecimalStrings($deltaString, $digits);
-    }
-
-    /**
-     * Add two unsigned decimal strings.
-     */
-    private function addUnsignedDecimalStrings(string $left, string $right): string
-    {
-        $leftLength = \strlen($left);
-        $rightLength = \strlen($right);
-        $carry = 0;
-        $result = '';
-
-        for ($leftIndex = $leftLength - 1, $rightIndex = $rightLength - 1;
-            $leftIndex >= 0 || $rightIndex >= 0 || $carry !== 0;
-            $leftIndex--, $rightIndex--
-        ) {
-            $sum = $carry;
-            if ($leftIndex >= 0) {
-                $sum += \ord($left[$leftIndex]) - 48;
-            }
-            if ($rightIndex >= 0) {
-                $sum += \ord($right[$rightIndex]) - 48;
-            }
-            $result = \chr(48 + ($sum % 10)) . $result;
-            $carry = \intdiv($sum, 10);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Compare two unsigned decimal strings.
-     */
-    private function compareUnsignedDecimalStrings(string $left, string $right): int
-    {
-        $left = \ltrim($left, '0');
-        $right = \ltrim($right, '0');
-        $left = $left === '' ? '0' : $left;
-        $right = $right === '' ? '0' : $right;
-
-        $leftLength = \strlen($left);
-        $rightLength = \strlen($right);
-        if ($leftLength !== $rightLength) {
-            return $leftLength <=> $rightLength;
-        }
-
-        return \strcmp($left, $right) <=> 0;
-    }
-
-    /**
-     * Subtract one unsigned decimal string from another.
-     */
-    private function subtractUnsignedDecimalStrings(string $left, string $right): string
-    {
-        $leftLength = \strlen($left);
-        $rightLength = \strlen($right);
-        $borrow = 0;
-        $result = '';
-
-        for ($leftIndex = $leftLength - 1, $rightIndex = $rightLength - 1;
-            $leftIndex >= 0;
-            $leftIndex--, $rightIndex--
-        ) {
-            $digit = (\ord($left[$leftIndex]) - 48) - $borrow;
-            $subtrahend = $rightIndex >= 0
-                ? (\ord($right[$rightIndex]) - 48)
-                : 0;
-            if ($digit < $subtrahend) {
-                $digit += 10;
-                $borrow = 1;
-            } else {
-                $borrow = 0;
-            }
-            $result = \chr(48 + ($digit - $subtrahend)) . $result;
-        }
-
-        $result = \ltrim($result, '0');
-        return $result === '' ? '0' : $result;
-    }
-
 }

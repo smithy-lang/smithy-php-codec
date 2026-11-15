@@ -18,7 +18,6 @@ use Smithy\Core\Serde\TimestampFormat;
 final class CborCodecSettings extends AbstractCodecSettings
 {
     /**
-     * @param string|null $serviceNamespace Service namespace for codec consumers.
      * @param TimestampFormat|null $defaultTimestampFormat Fallback timestamp format.
      * @param bool $honorTimestampFormatTrait Whether to honor `timestampFormat`.
      * @param int<1, max> $maxBigIntegerBytes Maximum CBOR bignum byte length.
@@ -26,7 +25,6 @@ final class CborCodecSettings extends AbstractCodecSettings
      * @throws \InvalidArgumentException When the bignum limit is less than one.
      */
     public function __construct(
-        ?string $serviceNamespace = null,
         ?TimestampFormat $defaultTimestampFormat = null,
         bool $honorTimestampFormatTrait = false,
         public readonly int $maxBigIntegerBytes =
@@ -39,7 +37,6 @@ final class CborCodecSettings extends AbstractCodecSettings
         }
 
         parent::__construct(
-            $serviceNamespace,
             $defaultTimestampFormat,
             $honorTimestampFormatTrait
         );

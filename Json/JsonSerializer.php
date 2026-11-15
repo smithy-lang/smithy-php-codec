@@ -18,6 +18,7 @@ use Smithy\Core\Serde\TimestampFormat;
 use Smithy\Core\Shape\BigDecimal;
 use Smithy\Core\Shape\BigInteger;
 use Smithy\Core\Shape\Document\DocumentInterface;
+use Smithy\Core\Shape\Exception\InvalidShapeValueException;
 use Smithy\Core\Shape\UnionInterface;
 
 /**
@@ -25,6 +26,16 @@ use Smithy\Core\Shape\UnionInterface;
  */
 final class JsonSerializer implements ShapeSerializerInterface
 {
+    /**
+     * Per-process big-number placeholder prefix. The random part keeps user
+     * strings from matching it.
+     */
+    private static ?string $bigNumberPrefix = null;
+    /**
+     * Pattern that unwraps quoted big-number placeholders in flush().
+     */
+    private static ?string $bigNumberPattern = null;
+
     private readonly JsonCodecSettings $settings;
     private readonly bool $honorTimestampFormatTrait;
     private readonly bool $useStringForArbitraryPrecision;
@@ -66,9 +77,13 @@ final class JsonSerializer implements ShapeSerializerInterface
      */
     private array $frameStack = [];
     /**
-     * Whether the current payload may contain a BigNumberToken.
+     * Whether the current payload may contain a big-number placeholder.
      */
     private bool $rootHasBigNumber = false;
+    /**
+     * Number of big-number placeholders written into the current payload.
+     */
+    private int $bigNumberCount = 0;
     /**
      * Reused sub-serializer for nested document values.
      */
@@ -166,24 +181,11 @@ final class JsonSerializer implements ShapeSerializerInterface
      *
      * @return void
      */
-    public function serializeTimestamp(
-        Schema $schema,
-        float $value,
-        int $idx,
-        ?TimestampFormat $format = null
-    ): void
+    public function serializeTimestamp(Schema $schema, float $value, int $idx): void
     {
         // Prefer the frame's precomputed member format.
-        $resolved = ($this->honorTimestampFormatTrait
-            ? ($this->timestampFormats[$idx] ?? $format)
-            : null
-        ) ?? $this->settings->defaultTimestampFormat;
-
-        if ($resolved === TimestampFormat::EpochSeconds) {
-            $this->emit($value, $idx);
-            return;
-        }
-        $this->emit($resolved->format($value), $idx);
+        $format = $this->timestampFormats[$idx] ?? null;
+        $this->emit($this->formatTimestamp($format, $value), $idx);
     }
 
     /**
@@ -191,44 +193,10 @@ final class JsonSerializer implements ShapeSerializerInterface
      *
      * @return void
      */
-    public function serializeList(
-        Schema $schema,
-        array $list,
-        int $idx
-    ): void
+    public function serializeList(Schema $schema, array $list, int $idx): void
     {
-        // Read sparse handling from the extension once.
-        static $extKey = null;
-        $extKey ??= JsonSchemaExtensionProvider::key();
-        $memberSchema = $schema->listMember;
-        /** @var JsonSchemaExtension|null $info */
-        $info = $schema->getExtension($extKey);
-        $sparse = $info?->sparse ?? false;
-
-        if ($memberSchema === null) {
-            $this->emit($list, $idx);
-            return;
-        }
-
-        $type = $info?->listMemberType
-            ?? $memberSchema->type
-            ?? ShapeType::Document->value;
-        $context = $type === ShapeType::Timestamp->value
-            ? $info?->listMemberTimestampFormat
-            : $memberSchema;
-        $out = [];
-        foreach ($list as $item) {
-            if ($item === null) {
-                if ($sparse) {
-                    $out[] = null;
-                }
-                continue;
-            }
-            $out[] = $this->renderValue($type, $item, $context);
-        }
-        $this->emit($out, $idx);
+        $this->emit($this->renderListInline($schema, $list), $idx);
     }
-
 
     /**
      * Serialize a map member into the current JSON frame.
@@ -237,55 +205,8 @@ final class JsonSerializer implements ShapeSerializerInterface
      */
     public function serializeMap(Schema $schema, array $map, int $idx): void
     {
-        // Read sparse handling from the extension once.
-        static $extKey = null;
-        $extKey ??= JsonSchemaExtensionProvider::key();
-        $valueSchema = $schema->mapValue;
-        /** @var JsonSchemaExtension|null $info */
-        $info = $schema->getExtension($extKey);
-        $sparse = $info?->sparse ?? false;
-
-        $out = [];
-        if ($valueSchema === null) {
-            foreach ($map as $key => $value) {
-                $stringKey = (string) $key;
-                if ($value === null) {
-                    if ($sparse) {
-                        $out[$stringKey] = null;
-                    }
-                    continue;
-                }
-                $out[$stringKey] = $value;
-            }
-        } else {
-            $type = $info?->mapValueType ?? $valueSchema->type;
-            $context = $type === ShapeType::Timestamp->value
-                ? $info?->mapValueTimestampFormat
-                : $valueSchema;
-            foreach ($map as $key => $value) {
-                $stringKey = (string) $key;
-                if ($value === null) {
-                    if ($sparse) {
-                        $out[$stringKey] = null;
-                    }
-                    continue;
-                }
-
-                $out[$stringKey] = $this->renderValue(
-                    $type,
-                    $value,
-                    $context
-                );
-            }
-        }
-        // Empty maps must render as `{}`.
-        if ($out === []) {
-            $this->emit(new \stdClass(), $idx);
-            return;
-        }
-        $this->emit($out, $idx);
+        $this->emit($this->renderMapInline($schema, $map), $idx);
     }
-
 
     /**
      * Serialize a structure member into the current JSON frame.
@@ -317,11 +238,11 @@ final class JsonSerializer implements ShapeSerializerInterface
         /** @var JsonSchemaExtension|null $info */
         $info = $schema->getExtension($extKey);
 
-        // Capture the top-level big-number flag once.
-        if ($this->frameStack === []) {
-            $this->rootHasBigNumber =
-                !$this->useStringForArbitraryPrecision
-                && ($info?->hasBigNumber ?? false);
+        // Never clear the flag here: inline structs leave the stack empty.
+        if ($this->frameStack === [] && !$this->useStringForArbitraryPrecision
+            && ($info?->hasBigNumber ?? false)
+        ) {
+            $this->rootHasBigNumber = true;
         }
 
         // Save the parent frame before rebinding `$current`.
@@ -426,6 +347,7 @@ final class JsonSerializer implements ShapeSerializerInterface
         $this->timestampFormats = null;
         $this->frameStack = [];
         $this->rootHasBigNumber = false;
+        $this->bigNumberCount = 0;
     }
 
     /**
@@ -443,24 +365,34 @@ final class JsonSerializer implements ShapeSerializerInterface
             );
         }
         // Unwrap big-number placeholders only when the payload uses them.
-        if ($this->rootHasBigNumber) {
-            $pattern = '/"'
-                . \preg_quote(BigNumberToken::ENCODED_PREFIX, '/')
-                . '(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)"/';
-            $encoded = \preg_replace_callback(
-                $pattern,
-                static fn(array $m): string => $m[1],
-                $encoded
+        if ($this->bigNumberCount > 0 && self::$bigNumberPattern !== null) {
+            $replaced = 0;
+            $encoded = \preg_replace(
+                self::$bigNumberPattern,
+                '$1',
+                $encoded,
+                -1,
+                $replaced
             );
             if ($encoded === null) {
                 throw new SerializationException(
                     'JSON serialization failed while unwrapping big numbers.'
                 );
             }
+            // A mismatch means a user string collided with a placeholder.
+            if ($replaced !== $this->bigNumberCount) {
+                $this->root = null;
+                $this->rootHasBigNumber = false;
+                $this->bigNumberCount = 0;
+                throw new SerializationException(
+                    'JSON serialization failed: a value collided with a big-number placeholder.'
+                );
+            }
         }
         // Keep the instance reusable after flush().
         $this->root = null;
         $this->rootHasBigNumber = false;
+        $this->bigNumberCount = 0;
         return $encoded;
     }
 
@@ -602,16 +534,8 @@ final class JsonSerializer implements ShapeSerializerInterface
 
         $out = [];
         if ($itemSchema === null || $type === null) {
-            foreach ($items as $item) {
-                if ($item === null) {
-                    if ($sparse) {
-                        $out[] = null;
-                    }
-                    continue;
-                }
-                $out[] = $item;
-            }
-            return $out;
+            // Untyped lists pass through unchanged, nulls included.
+            return $items;
         }
 
         $context = $type === ShapeType::Timestamp->value
@@ -619,6 +543,8 @@ final class JsonSerializer implements ShapeSerializerInterface
             : ($type === ShapeType::Union->value
                 ? $info?->listMemberUnionInfo ?? $itemSchema
                 : $itemSchema);
+        // Skip the renderValue() dispatch for the common string case.
+        $isString = $type === ShapeType::String_->value;
         foreach ($items as $item) {
             if ($item === null) {
                 if ($sparse) {
@@ -626,7 +552,9 @@ final class JsonSerializer implements ShapeSerializerInterface
                 }
                 continue;
             }
-            $out[] = $this->renderValue($type, $item, $context);
+            $out[] = $isString
+                ? (string) $item
+                : $this->renderValue($type, $item, $context);
         }
         return $out;
     }
@@ -643,17 +571,8 @@ final class JsonSerializer implements ShapeSerializerInterface
         $out = [];
 
         if ($valueSchema === null) {
-            foreach ($entries as $key => $value) {
-                $stringKey = (string) $key;
-                if ($value === null) {
-                    if ($sparse) {
-                        $out[$stringKey] = null;
-                    }
-                    continue;
-                }
-                $out[$stringKey] = $value;
-            }
-            return $out === [] ? new \stdClass() : $out;
+            // Untyped maps pass through unchanged, nulls included.
+            return $entries === [] ? new \stdClass() : $entries;
         }
 
         $type = $info?->mapValueType ?? $valueSchema->type;
@@ -662,19 +581,18 @@ final class JsonSerializer implements ShapeSerializerInterface
             : ($type === ShapeType::Union->value
                 ? $info?->mapValueUnionInfo ?? $valueSchema
                 : $valueSchema);
+        // Skip the renderValue() dispatch for the common string case.
+        $isString = $type === ShapeType::String_->value;
         foreach ($entries as $key => $value) {
-            $stringKey = (string) $key;
             if ($value === null) {
                 if ($sparse) {
-                    $out[$stringKey] = null;
+                    $out[$key] = null;
                 }
                 continue;
             }
-            $out[$stringKey] = $this->renderValue(
-                $type,
-                $value,
-                $context
-            );
+            $out[$key] = $isString
+                ? (string) $value
+                : $this->renderValue($type, $value, $context);
         }
         return $out === [] ? new \stdClass() : $out;
     }
@@ -686,24 +604,27 @@ final class JsonSerializer implements ShapeSerializerInterface
         $extKey ??= JsonSchemaExtensionProvider::key();
         /** @var JsonSchemaExtension|null $info */
         $info = $memberSchema->getExtension($extKey);
-        $resolved = ($this->honorTimestampFormatTrait
-            ? $info?->memberTimestampFormat
-            : null
-        ) ?? $this->settings->defaultTimestampFormat;
 
-        $epoch = $value;
+        return $this->formatTimestamp($info?->memberTimestampFormat, $value);
+    }
 
+    /**
+     * Render a timestamp with a member format, or the codec default.
+     */
+    private function formatTimestamp(?TimestampFormat $format, mixed $value): mixed
+    {
+        $resolved = ($this->honorTimestampFormatTrait ? $format : null)
+            ?? $this->settings->defaultTimestampFormat;
         if ($value instanceof \DateTimeInterface) {
-            $epoch = (float) $value->format('U.u');
-            if ($epoch == (int) $epoch) {
-                $epoch = (int) $epoch;
+            $value = (float) $value->format('U.u');
+            if ($value == (int) $value) {
+                $value = (int) $value;
             }
         }
 
-        if ($resolved === TimestampFormat::EpochSeconds) {
-            return $epoch;
-        }
-        return $resolved->format($epoch);
+        return $resolved === TimestampFormat::EpochSeconds
+            ? $value
+            : $resolved->format($value);
     }
 
     /**
@@ -753,25 +674,9 @@ final class JsonSerializer implements ShapeSerializerInterface
                 return $this->renderBigDecimal($value);
 
             case ShapeType::Timestamp->value:
-                if ($context instanceof Schema) {
-                    return $this->renderTimestamp($context, $value);
-                }
-
-                $resolved = ($this->honorTimestampFormatTrait
-                    ? $context
-                    : null
-                ) ?? $this->settings->defaultTimestampFormat;
-                $epoch = $value;
-                if ($value instanceof \DateTimeInterface) {
-                    $epoch = (float) $value->format('U.u');
-                    if ($epoch == (int) $epoch) {
-                        $epoch = (int) $epoch;
-                    }
-                }
-
-                return $resolved === TimestampFormat::EpochSeconds
-                    ? $epoch
-                    : $resolved->format($epoch);
+                return $context instanceof Schema
+                    ? $this->renderTimestamp($context, $value)
+                    : $this->formatTimestamp($context, $value);
 
             case ShapeType::Structure->value:
                 return $this->renderStruct($context, $value);
@@ -803,42 +708,59 @@ final class JsonSerializer implements ShapeSerializerInterface
         $value->serialize($sub, 0);
         if ($sub->rootHasBigNumber) {
             $this->rootHasBigNumber = true;
+            $this->bigNumberCount += $sub->bigNumberCount;
         }
         $encoded = $sub->root;
         return $encoded;
     }
 
-    private function renderBigInteger(mixed $value): string|BigNumberToken
+    private function renderBigInteger(mixed $value): string
     {
-        $number = $value instanceof BigInteger
-            ? $value->value
-            : (string) $value;
-        $number = self::normalizeBigIntegerDigits($number);
+        if (!$value instanceof BigInteger) {
+            try {
+                $value = new BigInteger((string) $value);
+            } catch (InvalidShapeValueException $e) {
+                throw new SerializationException($e->getMessage(), 0, $e);
+            }
+        }
+        $number = self::normalizeBigIntegerDigits($value->value);
 
         return $this->useStringForArbitraryPrecision
             ? $number
-            : $this->wrapBigNumberToken($number);
+            : $this->wrapBigNumber($number);
     }
 
-    private function renderBigDecimal(mixed $value): string|BigNumberToken
+    private function renderBigDecimal(mixed $value): string
     {
-        $number = $value instanceof BigDecimal
-            ? $value->value
-            : (string) $value;
+        if (!$value instanceof BigDecimal) {
+            try {
+                $value = new BigDecimal((string) $value);
+            } catch (InvalidShapeValueException $e) {
+                throw new SerializationException($e->getMessage(), 0, $e);
+            }
+        }
+        $number = $value->value;
 
         return $this->useStringForArbitraryPrecision
             ? $number
-            : $this->wrapBigNumberToken($number);
+            : $this->wrapBigNumber($number);
     }
 
     /**
-     * Mark the current payload as containing a big number and create its
-     * replacement token.
+     * Mark the payload as containing a big number and return its placeholder.
      */
-    private function wrapBigNumberToken(string $number): BigNumberToken
+    private function wrapBigNumber(string $number): string
     {
         $this->rootHasBigNumber = true;
-        return new BigNumberToken($number);
+        $this->bigNumberCount++;
+        if (self::$bigNumberPrefix === null) {
+            self::$bigNumberPrefix = '__SMITHY_BIGNUM_'
+                . \bin2hex(\random_bytes(8)) . '__';
+            self::$bigNumberPattern = '/"' . \preg_quote(self::$bigNumberPrefix, '/')
+                . '(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)"/';
+        }
+
+        return self::$bigNumberPrefix . $number;
     }
 
     /**

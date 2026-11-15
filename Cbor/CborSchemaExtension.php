@@ -59,11 +59,14 @@ final class CborSchemaExtension
         public readonly array $orderedMemberNameLengths = [],
 
         /**
-         * FNV-1a hashes parallel to orderedMemberNameBytes.
+         * Schema-order slots by raw member-name bytes.
          *
-         * @var list<int>
+         * @var array<string, int>
          */
-        public readonly array $orderedMemberNameHashes = [],
+        public readonly array $memberSlotByName = [],
+
+        /** Longest raw member-name length, in bytes. */
+        public readonly int $maxMemberNameLength = 0,
 
         /**
          * Packed short-name lookup table for 1-byte names.
@@ -162,6 +165,9 @@ final class CborSchemaExtension
 
         /** Explicit timestamp format for timestamp map values. */
         public readonly ?TimestampFormat $mapValueTimestampFormat = null,
+
+        /** Explicit timestamp format for timestamp schemas. */
+        public readonly ?TimestampFormat $timestampFormat = null,
 
         /** Resolved target class for member schemas. */
         public readonly ?string $resolvedTargetClass = null,

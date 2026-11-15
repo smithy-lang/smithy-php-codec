@@ -226,15 +226,10 @@ final class XmlSerializer implements ShapeSerializerInterface
      *
      * @return void
      */
-    public function serializeTimestamp(
-        Schema $schema,
-        float $value,
-        int $idx,
-        ?TimestampFormat $format = null
-    ): void
+    public function serializeTimestamp(Schema $schema, float $value, int $idx): void
     {
         $resolved = ($this->honorTimestampFormatTrait
-            ? ($this->tsFormats[$idx] ?? $format)
+            ? $this->tsFormats[$idx] ?? null
             : null
         ) ?? $this->settings->defaultTimestampFormat;
         $formatted = $resolved->format($value);

@@ -21,12 +21,6 @@ use Smithy\Core\Serde\TimestampFormat;
 final class CborSchemaExtensionProvider
     implements SchemaExtensionProviderInterface
 {
-    /**
-     * 32-bit FNV-1a constants used for raw member-name byte pre-hashes.
-     */
-    private const FNV_OFFSET = 2166136261;
-    private const FNV_PRIME = 16777619;
-
     public static ?SchemaExtensionKey $KEY = null;
 
     /**
@@ -171,6 +165,15 @@ final class CborSchemaExtensionProvider
             );
         }
 
+        if ($schema->type === ShapeType::Timestamp->value) {
+            return new CborSchemaExtension(
+                memberNameBytes: $memberNameBytes,
+                timestampFormat: TimestampFormat::fromTraitString(
+                    $schema->getTrait(Schema::T_TIMESTAMP_FORMAT)
+                )
+            );
+        }
+
         if ($schema->type !== ShapeType::Structure->value
             && $schema->type !== ShapeType::Union->value
         ) {
@@ -184,7 +187,8 @@ final class CborSchemaExtensionProvider
         $orderedMemberTypes = [];
         $orderedMemberNameBytes = [];
         $orderedMemberNameLengths = [];
-        $orderedMemberNameHashes = [];
+        $memberSlotByName = [];
+        $maxMemberNameLength = 0;
         $orderedMemberLookup1 = [];
         $orderedMemberLookup2 = [];
         $orderedMemberLookup3 = [];
@@ -215,7 +219,11 @@ final class CborSchemaExtensionProvider
             $orderedMemberNameBytes[] = $rawNameBytes;
             $nameLength = \strlen($rawNameBytes);
             $orderedMemberNameLengths[] = $nameLength;
-            $orderedMemberNameHashes[] = self::hash($rawNameBytes);
+            if ($nameLength > $maxMemberNameLength) {
+                $maxMemberNameLength = $nameLength;
+            }
+            $memberSlotByName[$rawNameBytes] =
+                \count($orderedMemberSchemas) - 1;
 
             if ($nameLength >= 1 && $nameLength <= 4) {
                 $packed = self::packShortAsciiKey($rawNameBytes, $nameLength);
@@ -312,7 +320,8 @@ final class CborSchemaExtensionProvider
             orderedMemberTypes: $orderedMemberTypes,
             orderedMemberNameBytes: $orderedMemberNameBytes,
             orderedMemberNameLengths: $orderedMemberNameLengths,
-            orderedMemberNameHashes: $orderedMemberNameHashes,
+            memberSlotByName: $memberSlotByName,
+            maxMemberNameLength: $maxMemberNameLength,
             orderedMemberLookup1: $orderedMemberLookup1,
             orderedMemberLookup2: $orderedMemberLookup2,
             orderedMemberLookup3: $orderedMemberLookup3,
@@ -356,21 +365,6 @@ final class CborSchemaExtensionProvider
         }
 
         return "\x7A" . \pack('N', $length) . $memberName;
-    }
-
-    /**
-     * Hash member-name bytes with FNV-1a.
-     */
-    private static function hash(string $memberNameBytes): int
-    {
-        $hash = self::FNV_OFFSET;
-        $length = \strlen($memberNameBytes);
-        for ($i = 0; $i < $length; $i++) {
-            $hash ^= \ord($memberNameBytes[$i]);
-            $hash = ($hash * self::FNV_PRIME) & 0xFFFFFFFF;
-        }
-
-        return $hash;
     }
 
     /**

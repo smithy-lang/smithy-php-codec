@@ -62,8 +62,6 @@ final class CborDeserializer implements ShapeDeserializerInterface
     private const TAG_NEG_BIGINT = 3;
     private const TAG_DECIMAL = 4;
 
-    private const FNV_OFFSET = 2166136261;
-    private const FNV_PRIME = 16777619;
     private const MAX_DEPTH = 128;
 
     private readonly CborCodecSettings $settings;
@@ -82,9 +80,9 @@ final class CborDeserializer implements ShapeDeserializerInterface
         ?CborCodecSettings $settings = null
     )
     {
-        $length = $source->getSize();
+        // getContents() starts at the cursor, so getSize() can overcount.
         $this->payload = $source->getContents();
-        $this->length = $length ?? \strlen($this->payload);
+        $this->length = \strlen($this->payload);
         $this->settings = $settings ?? new CborCodecSettings();
         $this->honorTimestampFormatTrait =
             $this->settings->honorTimestampFormatTrait;
@@ -115,29 +113,6 @@ final class CborDeserializer implements ShapeDeserializerInterface
         if ($this->idx !== $this->length) {
             $this->malformed();
         }
-    }
-
-    /**
-     * Decode a type-preserving tree for semantic CBOR comparison.
-     *
-     * The result normalizes map ordering and encoding widths while retaining
-     * data item types and tags.
-     *
-     * @return array<string, mixed>
-     *
-     * @internal
-     */
-    public function decodeComparableValue(): array
-    {
-        $this->idx = 0;
-        $this->depth = 0;
-        $value = $this->readComparableValue();
-
-        if ($this->idx !== $this->length) {
-            $this->malformed();
-        }
-
-        return $value;
     }
 
     /**
@@ -173,7 +148,8 @@ final class CborDeserializer implements ShapeDeserializerInterface
         $orderedTypes = $info->orderedMemberTypes;
         $orderedNameBytes = $info->orderedMemberNameBytes;
         $orderedNameLengths = $info->orderedMemberNameLengths;
-        $orderedNameHashes = $info->orderedMemberNameHashes;
+        $memberSlotByName = $info->memberSlotByName;
+        $maxNameLength = $info->maxMemberNameLength;
         $orderedLookup1 = $info->orderedMemberLookup1;
         $orderedLookup2 = $info->orderedMemberLookup2;
         $orderedLookup3 = $info->orderedMemberLookup3;
@@ -301,47 +277,13 @@ final class CborDeserializer implements ShapeDeserializerInterface
                     $hint++;
                 }
 
-                if ($memberSlot < 0) {
-                    $hash = self::FNV_OFFSET;
-                    $end = $start + $length;
-                    for ($j = $start; $j < $end; $j++) {
-                        $hash ^= \ord($payload[$j]);
-                        $hash = ($hash * self::FNV_PRIME) & 0xFFFFFFFF;
-                    }
-                    $scanLimit = $hint + 4 < $orderedCount
-                        ? $hint + 4
-                        : $orderedCount;
-                    for ($i = $hint; $i < $scanLimit; $i++) {
-                        if ($orderedNameHashes[$i] === $hash
-                            && $orderedNameLengths[$i] === $length
-                            && \substr_compare(
-                                $payload,
-                                $orderedNameBytes[$i],
-                                $start,
-                                $length
-                            ) === 0
-                        ) {
-                            $memberSlot = $i;
-                            $hint = $i + 1;
-                            break;
-                        }
-                    }
-
-                    if ($memberSlot < 0) {
-                        for ($i = 0; $i < $orderedCount; $i++) {
-                            if ($orderedNameHashes[$i] === $hash
-                                && $orderedNameLengths[$i] === $length
-                                && \substr_compare(
-                                    $payload,
-                                    $orderedNameBytes[$i],
-                                    $start,
-                                    $length
-                                ) === 0
-                            ) {
-                                $memberSlot = $i;
-                                break;
-                            }
-                        }
+                // Skip the copy for names longer than any member.
+                if ($memberSlot < 0 && $length <= $maxNameLength) {
+                    $memberSlot = $memberSlotByName[
+                        \substr($payload, $start, $length)
+                    ] ?? -1;
+                    if ($memberSlot >= 0) {
+                        $hint = $memberSlot + 1;
                     }
                 }
             }
@@ -486,33 +428,8 @@ final class CborDeserializer implements ShapeDeserializerInterface
                 ) {
                     $wireKey = '__type';
                 } elseif ($memberSlot < 0) {
-                    $orderedNameBytes = $info->orderedMemberNameBytes;
-                    $orderedNameLengths = $info->orderedMemberNameLengths;
-                    $orderedNameHashes = $info->orderedMemberNameHashes;
-                    $orderedCount = \count($decodeEntries);
-                    $hash = self::FNV_OFFSET;
-                    $end = $start + $length;
-                    for ($j = $start; $j < $end; $j++) {
-                        $hash ^= \ord($payload[$j]);
-                        $hash = ($hash * self::FNV_PRIME) & 0xFFFFFFFF;
-                    }
-                    for ($i = 0; $i < $orderedCount; $i++) {
-                        if ($orderedNameHashes[$i] === $hash
-                            && $orderedNameLengths[$i] === $length
-                            && \substr_compare(
-                                $payload,
-                                $orderedNameBytes[$i],
-                                $start,
-                                $length
-                            ) === 0
-                        ) {
-                            $memberSlot = $i;
-                            break;
-                        }
-                    }
-                    if ($memberSlot < 0) {
-                        $wireKey = \substr($payload, $start, $length);
-                    }
+                    $wireKey = \substr($payload, $start, $length);
+                    $memberSlot = $info->memberSlotByName[$wireKey] ?? -1;
                 }
             }
 
@@ -640,7 +557,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
         $remaining = $indefinite ? -1 : $this->readLengthFromInfo($infoByte);
         $orderedNameBytes = $info->orderedMemberNameBytes;
         $orderedNameLengths = $info->orderedMemberNameLengths;
-        $orderedNameHashes = $info->orderedMemberNameHashes;
+        $memberSlotByName = $info->memberSlotByName;
         $orderedLookup1 = $info->orderedMemberLookup1;
         $orderedLookup2 = $info->orderedMemberLookup2;
         $orderedLookup3 = $info->orderedMemberLookup3;
@@ -773,52 +690,10 @@ final class CborDeserializer implements ShapeDeserializerInterface
                 }
 
                 if ($wireKey === '' && $memberSlot < 0) {
-                    $hash = self::FNV_OFFSET;
-                    $end = $start + $length;
-                    for ($j = $start; $j < $end; $j++) {
-                        $hash ^= \ord($payload[$j]);
-                        $hash = ($hash * self::FNV_PRIME) & 0xFFFFFFFF;
-                    }
-                    $scanLimit = $hint + 4 < $orderedCount
-                        ? $hint + 4
-                        : $orderedCount;
-                    for ($i = $hint; $i < $scanLimit; $i++) {
-                        if ($orderedNameHashes[$i] === $hash
-                            && $orderedNameLengths[$i] === $length
-                            && \substr_compare(
-                                $payload,
-                                $orderedNameBytes[$i],
-                                $start,
-                                $length
-                            ) === 0
-                        ) {
-                            $memberSlot = $i;
-                            $hint = $i + 1;
-                            $wireKey = $orderedNameBytes[$memberSlot];
-                            break;
-                        }
-                    }
-
-                    if ($memberSlot < 0 && $wireKey === '') {
-                        for ($i = 0; $i < $orderedCount; $i++) {
-                            if ($orderedNameHashes[$i] === $hash
-                                && $orderedNameLengths[$i] === $length
-                                && \substr_compare(
-                                    $payload,
-                                    $orderedNameBytes[$i],
-                                    $start,
-                                    $length
-                                ) === 0
-                            ) {
-                                $memberSlot = $i;
-                                $wireKey = $orderedNameBytes[$memberSlot];
-                                break;
-                            }
-                        }
-                    }
-
-                    if ($memberSlot < 0 && $wireKey === '') {
-                        $wireKey = \substr($payload, $start, $length);
+                    $wireKey = \substr($payload, $start, $length);
+                    $memberSlot = $memberSlotByName[$wireKey] ?? -1;
+                    if ($memberSlot >= 0) {
+                        $hint = $memberSlot + 1;
                     }
                 }
             }
@@ -1520,250 +1395,6 @@ final class CborDeserializer implements ShapeDeserializerInterface
                 * (1 + $mant / 1024)
             ),
         };
-    }
-
-    /**
-     * Read a type-preserving CBOR value for semantic comparison.
-     *
-     * @return array<string, mixed>
-     */
-    private function readComparableValue(): array
-    {
-        $initial = $this->readInitialByte();
-        $major = $initial >> 5;
-        $info = $initial & 0x1F;
-
-        return match ($major) {
-            self::MAJOR_POSINT,
-            self::MAJOR_NEGINT => [
-                'type' => 'integer',
-                'value' => $this->readIntegerFromMajorAndInfo(
-                    $major,
-                    $info
-                )
-            ],
-            self::MAJOR_BYTESTRING,
-            self::MAJOR_TEXTSTRING => $this->readComparableString(
-                $major,
-                $info
-            ),
-            self::MAJOR_ARRAY => $this->readComparableArray($info),
-            self::MAJOR_MAP => $this->readComparableMap($info),
-            self::MAJOR_TAG => $this->readComparableTag($info),
-            self::MAJOR_SIMPLE => $this->readComparableSimple($info),
-            default => $this->malformed()
-        };
-    }
-
-    /**
-     * Read a comparable byte or text string.
-     *
-     * @return array{type: string, value: string}
-     */
-    private function readComparableString(int $major, int $info): array
-    {
-        $value = '';
-        if ($info === self::INFO_INDEFINITE) {
-            while (!$this->consumeBreak()) {
-                $initial = $this->readInitialByte();
-                $chunkMajor = $initial >> 5;
-                $chunkInfo = $initial & 0x1F;
-                if ($chunkMajor !== $major
-                    || $chunkInfo === self::INFO_INDEFINITE
-                ) {
-                    $this->malformed();
-                }
-                $value .= $this->readBytes(
-                    $this->readLengthFromInfo($chunkInfo)
-                );
-            }
-        } else {
-            $value = $this->readBytes(
-                $this->readLengthFromInfo($info)
-            );
-        }
-
-        return [
-            'type' => $major === self::MAJOR_BYTESTRING
-                ? 'byte-string'
-                : 'text-string',
-            'value' => $value
-        ];
-    }
-
-    /**
-     * Read a comparable CBOR array.
-     *
-     * @return array{type: string, value: list<array<string, mixed>>}
-     */
-    private function readComparableArray(int $info): array
-    {
-        if (++$this->depth > self::MAX_DEPTH) {
-            $this->malformed();
-        }
-
-        $indefinite = $info === self::INFO_INDEFINITE;
-        $remaining = $indefinite
-            ? -1
-            : $this->readLengthFromInfo($info);
-        $values = [];
-
-        while (true) {
-            if ($indefinite && $this->consumeBreak()) {
-                break;
-            }
-            if (!$indefinite && $remaining-- <= 0) {
-                break;
-            }
-            $values[] = $this->readComparableValue();
-        }
-
-        $this->depth--;
-
-        return [
-            'type' => 'array',
-            'value' => $values
-        ];
-    }
-
-    /**
-     * Read a comparable CBOR map with deterministically ordered entries.
-     *
-     * @return array{
-     *     type: string,
-     *     value: list<array{
-     *         key: array<string, mixed>,
-     *         value: array<string, mixed>
-     *     }>
-     * }
-     */
-    private function readComparableMap(int $info): array
-    {
-        if (++$this->depth > self::MAX_DEPTH) {
-            $this->malformed();
-        }
-
-        $indefinite = $info === self::INFO_INDEFINITE;
-        $remaining = $indefinite
-            ? -1
-            : $this->readLengthFromInfo($info);
-        $entries = [];
-
-        while (true) {
-            if ($indefinite && $this->consumeBreak()) {
-                break;
-            }
-            if (!$indefinite && $remaining-- <= 0) {
-                break;
-            }
-            $entries[] = [
-                'key' => $this->readComparableValue(),
-                'value' => $this->readComparableValue()
-            ];
-        }
-
-        $this->depth--;
-        \usort(
-            $entries,
-            static fn(array $left, array $right): int => \strcmp(
-                \serialize($left),
-                \serialize($right)
-            )
-        );
-
-        return [
-            'type' => 'map',
-            'value' => $entries
-        ];
-    }
-
-    /**
-     * Read a comparable tagged value.
-     *
-     * @return array<string, mixed>
-     */
-    private function readComparableTag(int $info): array
-    {
-        $tag = $this->readLengthFromInfo($info);
-        if (++$this->depth > self::MAX_DEPTH) {
-            $this->malformed();
-        }
-        $value = $this->readComparableValue();
-        $this->depth--;
-        if ($tag === self::TAG_EPOCH
-            && ($value['type'] ?? null) === 'integer'
-            && \sprintf('%.0f', (float) $value['value'])
-                === (string) $value['value']
-        ) {
-            $value = [
-                'type' => 'float',
-                'value' => (float) $value['value']
-            ];
-        }
-
-        return [
-            'type' => 'tag',
-            'tag' => $tag,
-            'value' => $value
-        ];
-    }
-
-    /**
-     * Read a comparable CBOR simple or floating-point value.
-     *
-     * @return array<string, mixed>
-     */
-    private function readComparableSimple(int $info): array
-    {
-        if ($info < self::SIMPLE_FALSE) {
-            return [
-                'type' => 'simple',
-                'value' => $info
-            ];
-        }
-
-        return match ($info) {
-            self::SIMPLE_FALSE => [
-                'type' => 'boolean',
-                'value' => false
-            ],
-            self::SIMPLE_TRUE => [
-                'type' => 'boolean',
-                'value' => true
-            ],
-            self::SIMPLE_NULL => ['type' => 'null'],
-            self::SIMPLE_UNDEFINED => ['type' => 'undefined'],
-            self::INFO_ONE_BYTE => [
-                'type' => 'simple',
-                'value' => $this->readLengthFromInfo($info)
-            ],
-            self::SIMPLE_HALF_FLOAT,
-            self::SIMPLE_FLOAT,
-            self::SIMPLE_DOUBLE => [
-                'type' => 'float',
-                'value' => $this->normalizeComparableFloat(
-                    $this->readFloatFromInfo($info)
-                )
-            ],
-            default => $this->malformed()
-        };
-    }
-
-    private function normalizeComparableFloat(float $value): float|string
-    {
-        if (\is_nan($value)) {
-            return 'NaN';
-        }
-        if (\is_infinite($value)) {
-            return $value > 0 ? 'Infinity' : '-Infinity';
-        }
-        if ($value === 0.0
-            && (\ord(\pack('E', $value)[0]) & 0x80) !== 0
-        ) {
-            return '-0';
-        }
-
-        return $value;
     }
 
     /**

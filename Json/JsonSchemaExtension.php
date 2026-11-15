@@ -18,14 +18,8 @@ use Smithy\Core\Serde\TimestampFormat;
 final class JsonSchemaExtension
 {
     public function __construct(
-        /** @var array<string, int> Wire names to member indices. */
-        public readonly array $memberIndexByWireName,
-
         /** @var array<int, string> Member indices to wire names. */
         public readonly array $wireNameByMemberIndex,
-
-        /** @var array<string, int> Raw member names to member indices. */
-        public readonly array $rawMemberIndexByWireName,
 
         /** @var array<int, string> Member indices to raw member names. */
         public readonly array $rawWireNameByMemberIndex,
@@ -64,7 +58,7 @@ final class JsonSchemaExtension
         /** @var array<int, TimestampFormat> Timestamp formats by member index. */
         public readonly array $timestampFormats,
 
-        /** Whether this schema graph may emit a BigNumberToken. */
+        /** Whether this schema graph may emit a big number. */
         public readonly bool $hasBigNumber,
 
         /** Cached struct or union member count. */

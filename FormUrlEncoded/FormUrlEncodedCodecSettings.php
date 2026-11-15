@@ -18,7 +18,6 @@ use Smithy\Core\Serde\TimestampFormat;
 final class FormUrlEncodedCodecSettings extends AbstractCodecSettings
 {
     /**
-     * @param ?string $serviceNamespace Service namespace for codec consumers.
      * @param ?TimestampFormat $defaultTimestampFormat Fallback timestamp
      *                                                format.
      * @param bool $honorXmlName Whether to honor `xmlName` traits.
@@ -30,7 +29,6 @@ final class FormUrlEncodedCodecSettings extends AbstractCodecSettings
      *                                        `timestampFormat`.
      */
     public function __construct(
-        ?string $serviceNamespace = null,
         ?TimestampFormat $defaultTimestampFormat = null,
         public readonly bool $honorXmlName = true,
         public readonly bool $capitalizeResolvedWireNames = false,
@@ -39,7 +37,6 @@ final class FormUrlEncodedCodecSettings extends AbstractCodecSettings
         bool $honorTimestampFormatTrait = true
     ) {
         parent::__construct(
-            $serviceNamespace,
             $defaultTimestampFormat,
             $honorTimestampFormatTrait
         );

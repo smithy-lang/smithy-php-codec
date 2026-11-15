@@ -63,14 +63,12 @@ final class JsonSchemaExtensionProvider
             return null;
         }
 
-        $byWireName = [];
         $byIndex = [];
         $memberDecodeByWireName = [];
         $unionDecodeByWireName = [];
         $unionEncodeByMemberName = [];
         $unionEncodeByMemberIndex = [];
         $orderedMembers = [];
-        $rawByWireName = [];
         $rawByIndex = [];
         $rawMemberDecodeByWireName = [];
         $rawUnionDecodeByWireName = [];
@@ -88,11 +86,9 @@ final class JsonSchemaExtensionProvider
             $memberName = $member->memberName;
             $wireName = $member->getTrait(Schema::T_JSON_NAME) ?? $memberName;
 
-            $byWireName[$wireName] = $idx;
             $byIndex[$idx] = $wireName;
 
             // Keep raw lookup tables alongside the @jsonName tables.
-            $rawByWireName[$memberName] = $idx;
             $rawByIndex[$idx] = $memberName;
 
             if ($member->type === 17 || $member->type === 18) {
@@ -178,9 +174,7 @@ final class JsonSchemaExtensionProvider
         }
 
         return new JsonSchemaExtension(
-            memberIndexByWireName: $byWireName,
             wireNameByMemberIndex: $byIndex,
-            rawMemberIndexByWireName: $rawByWireName,
             rawWireNameByMemberIndex: $rawByIndex,
             memberDecodeByWireName: $memberDecodeByWireName,
             rawMemberDecodeByWireName: $rawMemberDecodeByWireName,
@@ -240,9 +234,7 @@ final class JsonSchemaExtensionProvider
         }
 
         return new JsonSchemaExtension(
-            memberIndexByWireName: [],
             wireNameByMemberIndex: [],
-            rawMemberIndexByWireName: [],
             rawWireNameByMemberIndex: [],
             memberDecodeByWireName: [],
             rawMemberDecodeByWireName: [],
@@ -295,9 +287,7 @@ final class JsonSchemaExtensionProvider
         }
 
         return new JsonSchemaExtension(
-            memberIndexByWireName: [],
             wireNameByMemberIndex: [],
-            rawMemberIndexByWireName: [],
             rawWireNameByMemberIndex: [],
             memberDecodeByWireName: [],
             rawMemberDecodeByWireName: [],
@@ -324,9 +314,7 @@ final class JsonSchemaExtensionProvider
         );
 
         return new JsonSchemaExtension(
-            memberIndexByWireName: [],
             wireNameByMemberIndex: [],
-            rawMemberIndexByWireName: [],
             rawWireNameByMemberIndex: [],
             memberDecodeByWireName: [],
             rawMemberDecodeByWireName: [],
@@ -345,9 +333,7 @@ final class JsonSchemaExtensionProvider
     private function buildEnumMemberInfo(Schema $schema): JsonSchemaExtension
     {
         return new JsonSchemaExtension(
-            memberIndexByWireName: [],
             wireNameByMemberIndex: [],
-            rawMemberIndexByWireName: [],
             rawWireNameByMemberIndex: [],
             memberDecodeByWireName: [],
             rawMemberDecodeByWireName: [],
