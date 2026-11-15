@@ -1,0 +1,19 @@
+{
+    "name": "smithy/codec",
+    "description": "Schema-driven serializers and deserializers for Smithy wire formats.",
+    "type": "library",
+    "license": "Apache-2.0",
+    "require": {
+        "ext-libxml": "*",
+        "ext-simplexml": "*",
+        "ext-xmlwriter": "*",
+        "php": ">=8.2",
+        "psr/http-message": "^2.0",
+        "smithy/core": "self.version"
+    },
+    "autoload": {
+        "psr-4": {
+            "Smithy\\Codec\\": ""
+        }
+    }
+}
