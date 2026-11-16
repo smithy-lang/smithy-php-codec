@@ -133,6 +133,12 @@ final class XmlDeserializer implements ShapeDeserializerInterface
                                     ) ?? $this->settings->defaultTimestampFormat
                                 )->parse($value);
                                 break;
+                            case ShapeType::BigInteger->value:
+                                $out[$idx] = new BigInteger($value);
+                                break;
+                            case ShapeType::BigDecimal->value:
+                                $out[$idx] = new BigDecimal($value);
+                                break;
                             case ShapeType::Blob->value:
                                 $out[$idx] = \base64_decode($value, true) ?: '';
                                 break;
@@ -213,6 +219,12 @@ final class XmlDeserializer implements ShapeDeserializerInterface
                                 '-Infinity' => -INF,
                                 default => (float) $s
                             };
+                            break;
+                        case ShapeType::BigInteger->value:
+                            $out[$idx] = new BigInteger((string) $child);
+                            break;
+                        case ShapeType::BigDecimal->value:
+                            $out[$idx] = new BigDecimal((string) $child);
                             break;
                         case ShapeType::Blob->value:
                             $out[$idx] = \base64_decode(
