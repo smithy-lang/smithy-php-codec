@@ -18,7 +18,6 @@ use Smithy\Core\Shape\ShapeType;
 use Smithy\Core\Serde\TimestampFormat;
 use Smithy\Core\Shape\BigDecimal;
 use Smithy\Core\Shape\BigInteger;
-use Smithy\Core\Shape\Document\AbstractDocument;
 use Smithy\Core\Shape\Document\StructDocument;
 use Smithy\Core\Shape\Document\UnionDocument;
 
@@ -365,7 +364,7 @@ final class JsonDeserializer implements ShapeDeserializerInterface
                 return $this->readMap($context, $value);
 
             case ShapeType::Document->value:
-                return AbstractDocument::fromValue($value);
+                return JsonDocumentReader::read($value, $this->settings);
 
             default:
                 return $value;
