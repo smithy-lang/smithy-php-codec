@@ -768,7 +768,8 @@ final class CborDeserializer implements ShapeDeserializerInterface
         Schema $schema,
         ?string $resolvedTargetClass = null,
         ?Schema $resolvedTargetSchema = null
-    ): mixed {
+    ): mixed
+    {
         switch ($type) {
             case ShapeType::Blob->value:
             case ShapeType::String_->value:
@@ -1150,7 +1151,8 @@ final class CborDeserializer implements ShapeDeserializerInterface
     private function readIntegerFromMajorAndInfo(
         int $major,
         int $info
-    ): int {
+    ): int
+    {
         $unsigned = $this->readLengthFromInfo($info);
 
         return $major === self::MAJOR_POSINT

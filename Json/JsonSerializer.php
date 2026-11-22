@@ -321,7 +321,8 @@ final class JsonSerializer implements ShapeSerializerInterface
         Schema $schema,
         ?DocumentInterface $value,
         int $idx
-    ): void {
+    ): void
+    {
         if ($value === null) {
             $this->emit(null, $idx);
             return;

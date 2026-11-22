@@ -80,8 +80,7 @@ final class XmlSchemaExtensionProvider
         $explicitXmlName = self::getXmlNameTrait($schema);
         if ($explicitXmlName !== null) {
             $xmlName = $explicitXmlName;
-        } elseif (
-            $schema->hasTrait(Schema::T_HTTP_PAYLOAD)
+        } elseif ($schema->hasTrait(Schema::T_HTTP_PAYLOAD)
             && (
                 $schema->type === ShapeType::Structure->value
                 || $schema->type === ShapeType::Union->value
@@ -280,8 +279,7 @@ final class XmlSchemaExtensionProvider
                         $memberSchema->type
                     ];
                 }
-            } elseif (
-                $memberSchema->type === ShapeType::List_->value
+            } elseif ($memberSchema->type === ShapeType::List_->value
                 && $memberSchema->hasTrait(Schema::T_XML_FLATTENED)
             ) {
                 $flatName = self::getXmlNameTrait($memberSchema)
@@ -297,8 +295,7 @@ final class XmlSchemaExtensionProvider
                     $memberSchema,
                     $listMember
                 ];
-            } elseif (
-                $memberSchema->type === ShapeType::Map->value
+            } elseif ($memberSchema->type === ShapeType::Map->value
                 && $memberSchema->hasTrait(Schema::T_XML_FLATTENED)
             ) {
                 $flatName = self::getXmlNameTrait($memberSchema)
@@ -356,8 +353,7 @@ final class XmlSchemaExtensionProvider
         $explicitXmlName = self::getXmlNameTrait($schema);
         if ($explicitXmlName !== null) {
             $structXmlName = $explicitXmlName;
-        } elseif (
-            $schema->isMember()
+        } elseif ($schema->isMember()
             && $schema->hasTrait(Schema::T_HTTP_PAYLOAD)
         ) {
             $structXmlName = self::resolvePayloadRootName($schema);

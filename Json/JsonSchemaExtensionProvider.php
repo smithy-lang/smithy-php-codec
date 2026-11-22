@@ -105,8 +105,7 @@ final class JsonSchemaExtensionProvider
                     $timestampFormats[$idx] = $resolved;
                 }
                 $decodeEntry = [$idx, 12, $resolved];
-            } elseif (
-                $member->type === 13
+            } elseif ($member->type === 13
                 || $member->type === 14
                 || $member->type === 15
                 || $member->type === 16
