@@ -74,7 +74,7 @@ This package depends on `smithy/core` and `psr/http-message`.
 
 ## Design
 
-See [Codec Design](../../docs/design/codec/serialization-codecs.md).
+See [Codec Design](https://github.com/smithy-lang/smithy-php/blob/main/docs/design/codec/serialization-codecs.md).
 
 ## Contributing
 
