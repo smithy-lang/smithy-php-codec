@@ -285,6 +285,7 @@ final class XmlSchemaExtensionProvider
                 $flatName = self::getXmlNameTrait($memberSchema)
                     ?? $memberSchema->memberName;
                 $listMember = $memberSchema->getListMember();
+                $elementMembers[$flatName] = $memberSchema;
                 $flattenedLists[$flatName] = [
                     'member' => $memberSchema,
                     'listMember' => $listMember
@@ -305,6 +306,7 @@ final class XmlSchemaExtensionProvider
                 $keyName = self::getXmlNameTrait($mapKey) ?? 'key';
                 $valueName = self::getXmlNameTrait($mapValue)
                     ?? 'value';
+                $elementMembers[$flatName] = $memberSchema;
                 $flattenedMaps[$flatName] = [
                     'member' => $memberSchema,
                     'keyName' => $keyName,

@@ -48,7 +48,7 @@ final class XmlSchemaExtension
          * @var list<array{0: string, 1: int, 2: int, 3?: TimestampFormat}>
          */
         public readonly array $attributeDeserMembers = [],
-        /** elementXmlName -> Schema for pre-filtered regular element members */
+        /** elementXmlName -> Schema for element members, flattened ones included */
         public readonly array $elementMembers = [],
         /** flatName => ['member' => Schema, 'listMember' => Schema] */
         public readonly array $flattenedLists = [],
