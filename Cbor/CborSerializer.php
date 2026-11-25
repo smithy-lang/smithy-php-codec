@@ -646,13 +646,16 @@ final class CborSerializer implements ShapeSerializerInterface
     }
 
     /**
-     * Return the encoded CBOR payload.
+     * Return the encoded CBOR payload and reset the serializer for reuse.
      *
      * @return string
      */
     public function flush(): string
     {
-        return $this->buffer;
+        $encoded = $this->buffer;
+        $this->reset();
+
+        return $encoded;
     }
 
     /**
