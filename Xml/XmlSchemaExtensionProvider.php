@@ -506,7 +506,11 @@ final class XmlSchemaExtensionProvider
             : $target->id;
     }
 
-    /** Normalize `@xmlNamespace` into `['uri' => ..., 'prefix' => ...]`. */
+    /**
+     * Normalize `@xmlNamespace` into `['uri' => ..., 'prefix' => ...]`.
+     *
+     * @return array{uri: string, prefix?: string}|null
+     */
     private static function resolveNamespace(mixed $nsTrait): ?array
     {
         if ($nsTrait === null) {

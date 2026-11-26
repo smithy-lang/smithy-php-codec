@@ -1098,6 +1098,7 @@ final class CborSerializer implements ShapeSerializerInterface
     /**
      * Serialize a list using precomputed member metadata.
      *
+     * @param array<mixed> $list
      * @return void
      */
     private function writeListValue(
@@ -1329,6 +1330,7 @@ final class CborSerializer implements ShapeSerializerInterface
     /**
      * Serialize a map using precomputed value metadata.
      *
+     * @param array<mixed> $map
      * @return void
      */
     private function writeMapValue(
@@ -1903,6 +1905,8 @@ final class CborSerializer implements ShapeSerializerInterface
 
     /**
      * Count list entries that will be emitted on the wire.
+     *
+     * @param array<mixed> $list
      */
     private function countListItems(array $list, bool $sparse): int
     {
@@ -1922,6 +1926,8 @@ final class CborSerializer implements ShapeSerializerInterface
 
     /**
      * Count map entries that will be emitted on the wire.
+     *
+     * @param array<mixed> $map
      */
     private function countMapEntries(array $map, bool $sparse): int
     {

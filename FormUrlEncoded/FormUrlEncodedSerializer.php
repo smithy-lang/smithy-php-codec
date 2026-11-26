@@ -729,6 +729,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     /**
      * Serialize a list whose member type is scalar.
      *
+     * @param array<mixed> $list
      * @return void
      */
     private function serializeScalarList(
@@ -845,6 +846,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     /**
      * Serialize a map whose value type is scalar.
      *
+     * @param array<mixed> $map
      * @return void
      */
     private function serializeScalarMap(

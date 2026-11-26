@@ -376,6 +376,8 @@ final class JsonDeserializer implements ShapeDeserializerInterface
      * Deserialize a JSON list.
      *
      * Uses extension metadata for the member type and timestamp format.
+     *
+     * @return list<mixed>
      */
     private function readList(Schema $member, mixed $value): array
     {
@@ -426,6 +428,9 @@ final class JsonDeserializer implements ShapeDeserializerInterface
     }
 
 
+    /**
+     * @return array<string, mixed>
+     */
     private function readMap(Schema $member, mixed $value): array
     {
         // `json_decode(..., true)` always returns arrays for objects.

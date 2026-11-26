@@ -69,7 +69,7 @@ final class JsonSerializer implements ShapeSerializerInterface
      * frame back into the parent at that `$idx`'s wire name.
      *
      * @var list<array{
-     *     0: array|null,
+     *     0: array<string, mixed>|null,
      *     1: array<int, string>|null,
      *     2: array<int, TimestampFormat>|null,
      *     3: int
@@ -409,6 +409,9 @@ final class JsonSerializer implements ShapeSerializerInterface
         $this->root = $value;
     }
 
+    /**
+     * @return array<string, mixed>|\stdClass
+     */
     private function renderStruct(Schema $memberSchema, mixed $value): array|\stdClass
     {
         // Cache the extension key in the hot path.
@@ -446,6 +449,9 @@ final class JsonSerializer implements ShapeSerializerInterface
         return $result === [] ? new \stdClass() : $result;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function renderUnion(
         Schema|JsonSchemaExtension $context,
         mixed $value
@@ -522,6 +528,10 @@ final class JsonSerializer implements ShapeSerializerInterface
     }
 
 
+    /**
+     * @param array<mixed> $items
+     * @return list<mixed>
+     */
     private function renderListInline(Schema $memberSchema, array $items): array
     {
         // Read list metadata from the extension once.
@@ -560,6 +570,10 @@ final class JsonSerializer implements ShapeSerializerInterface
         return $out;
     }
 
+    /**
+     * @param array<mixed> $entries
+     * @return array<string, mixed>|\stdClass
+     */
     private function renderMapInline(Schema $memberSchema, array $entries): array|\stdClass
     {
         // Read map metadata from the extension once.

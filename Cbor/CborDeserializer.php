@@ -910,6 +910,8 @@ final class CborDeserializer implements ShapeDeserializerInterface
      *
      * Sparse handling and container framing remain on the hot path while item
      * dispatch is delegated to readValue().
+     *
+     * @return list<mixed>
      */
     private function readList(Schema $schema): array
     {
@@ -995,6 +997,8 @@ final class CborDeserializer implements ShapeDeserializerInterface
      *
      * Key parsing, sparse handling, and container framing remain on the hot
      * path while value dispatch is delegated to readValue().
+     *
+     * @return array<string, mixed>
      */
     private function readMap(Schema $schema): array
     {

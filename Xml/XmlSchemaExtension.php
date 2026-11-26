@@ -42,23 +42,23 @@ final class XmlSchemaExtension
     public function __construct(
         /** Resolved element name for this struct (xmlName ?? shape name) */
         public readonly string $xmlName = '',
-        /** Resolved namespace ['uri' => ..., 'prefix' => ...] or null */
+        /** @var array{uri: string, prefix?: string}|null Resolved namespace */
         public readonly ?array $xmlNamespace = null,
         /** @var array<int, string> memberIndex -> XML wire name */
         public readonly array $memberWireNames = [],
-        /** attrXmlName -> Schema for pre-filtered xmlAttribute members */
+        /** @var array<string, Schema> attrXmlName -> pre-filtered xmlAttribute member */
         public readonly array $attributeMembers = [],
         /**
          * @var list<array{0: string, 1: int, 2: int, 3?: TimestampFormat}>
          */
         public readonly array $attributeDeserMembers = [],
-        /** elementXmlName -> Schema for element members, flattened ones included */
+        /** @var array<string, Schema> elementXmlName -> element member, flattened ones included */
         public readonly array $elementMembers = [],
-        /** flatName => ['member' => Schema, 'listMember' => Schema] */
+        /** @var array<string, array{member: Schema, listMember: ?Schema}> keyed by flatName */
         public readonly array $flattenedLists = [],
         /**
-         * flatName -> ['member' => Schema, 'keyName' => string,
-         * 'valueName' => string, 'mapValue' => Schema]
+         * @var array<string, array{member: Schema, keyName: string, valueName: string, mapValue: ?Schema}>
+         *      keyed by flatName
          */
         public readonly array $flattenedMaps = [],
         /**
@@ -132,8 +132,8 @@ final class XmlSchemaExtension
          */
         public readonly array $unionMembersByXmlName = [],
         /**
-         * memberName -> memberSchema for union variant lookup in
-         * serialization
+         * @var array<string, Schema> memberName -> memberSchema for union
+         *      variant lookup in serialization
          */
         public readonly array $unionMembersByName = [],
         /**
