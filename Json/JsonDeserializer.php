@@ -393,7 +393,7 @@ final class JsonDeserializer implements ShapeDeserializerInterface
         /** @var JsonSchemaExtension|null $info */
         $info = $member->getExtension($extKey);
         // Synthetic schemas may not have extension metadata.
-        $itemType = $info?->listMemberType ?? $itemSchema->type;
+        $itemType = $info->listMemberType ?? $itemSchema->type;
         $unionInfo = $itemType === ShapeType::Union->value
             ? $info?->listMemberUnionInfo
             : null;
@@ -442,7 +442,7 @@ final class JsonDeserializer implements ShapeDeserializerInterface
         $extKey ??= JsonSchemaExtensionProvider::key();
         /** @var JsonSchemaExtension|null $info */
         $info = $member->getExtension($extKey);
-        $valueType = $info?->mapValueType ?? $valueSchema->type;
+        $valueType = $info->mapValueType ?? $valueSchema->type;
         $unionInfo = $valueType === ShapeType::Union->value
             ? $info?->mapValueUnionInfo
             : null;

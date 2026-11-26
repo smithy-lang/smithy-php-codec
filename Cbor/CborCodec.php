@@ -59,7 +59,7 @@ final class CborCodec extends AbstractCodec
         $key ??= CborSchemaExtensionProvider::$KEY
             ?? CborSchemaExtensionProvider::key();
 
-        return $schema->getExtension($key)?->membersTemplate
+        return $schema->getExtension($key)->membersTemplate
             ?? parent::createMembersBuffer($schema);
     }
 

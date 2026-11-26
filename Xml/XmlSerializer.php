@@ -56,23 +56,20 @@ final class XmlSerializer implements ShapeSerializerInterface
     /** @var array<int, TimestampFormat> memberIndex -> TimestampFormat enum */
     private array $tsFormats = [];
     private bool $writerReleased = false;
-    /** @var list<\XMLWriter> */
-    private array $writerPool;
 
     /**
-     * @param \XMLWriter       $writer Backing XML writer.
-     * @param list<\XMLWriter> $writerPool Idle codec-owned writers available
-     *                                     for reuse.
+     * @param \XMLWriter $writer Backing XML writer.
+     * @param (\Closure(\XMLWriter): void)|null $releaseWriter Return the
+     *        writer to the codec's pool once this serializer is done.
      */
     public function __construct(
         private readonly \XMLWriter $writer,
         ?XmlCodecSettings $settings = null,
-        array &$writerPool = []
+        private readonly ?\Closure $releaseWriter = null
     ) {
         $this->settings = $settings ?? new XmlCodecSettings();
         $this->honorTimestampFormatTrait =
             $this->settings->honorTimestampFormatTrait;
-        $this->writerPool =& $writerPool;
     }
 
     /**
@@ -274,7 +271,7 @@ final class XmlSerializer implements ShapeSerializerInterface
         $nsUri = $memberNs['uri'] ?? null;
         $nsPrefix = $memberNs['prefix'] ?? null;
         $memberType = $info->listMemberType
-            ?? $listMember?->type
+            ?? $listMember->type
             ?? ShapeType::Document->value;
 
         switch ($memberType) {
@@ -759,8 +756,10 @@ final class XmlSerializer implements ShapeSerializerInterface
         }
 
         $this->writerReleased = true;
-        $this->writer->openMemory();
-        $this->writerPool[] = $this->writer;
+        if ($this->releaseWriter !== null) {
+            $this->writer->openMemory();
+            ($this->releaseWriter)($this->writer);
+        }
     }
 
     /**

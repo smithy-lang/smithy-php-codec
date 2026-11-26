@@ -240,7 +240,7 @@ final class JsonSerializer implements ShapeSerializerInterface
 
         // Never clear the flag here: inline structs leave the stack empty.
         if ($this->frameStack === [] && !$this->useStringForArbitraryPrecision
-            && ($info?->hasBigNumber ?? false)
+            && ($info->hasBigNumber ?? false)
         ) {
             $this->rootHasBigNumber = true;
         }
@@ -259,7 +259,7 @@ final class JsonSerializer implements ShapeSerializerInterface
         $this->wireNames = $this->settings->honorJsonName
             ? $info?->wireNameByMemberIndex
             : $info?->rawWireNameByMemberIndex;
-        $this->timestampFormats = $info?->timestampFormats ?? [];
+        $this->timestampFormats = $info->timestampFormats ?? [];
     }
 
     /**
@@ -530,8 +530,8 @@ final class JsonSerializer implements ShapeSerializerInterface
         $itemSchema = $memberSchema->listMember;
         /** @var JsonSchemaExtension|null $info */
         $info = $memberSchema->getExtension($extKey);
-        $sparse = $info?->sparse ?? false;
-        $type = $info?->listMemberType ?? $itemSchema?->type;
+        $sparse = $info->sparse ?? false;
+        $type = $info->listMemberType ?? $itemSchema?->type;
 
         $out = [];
         if ($itemSchema === null || $type === null) {
@@ -542,7 +542,7 @@ final class JsonSerializer implements ShapeSerializerInterface
         $context = $type === ShapeType::Timestamp->value
             ? $info?->listMemberTimestampFormat
             : ($type === ShapeType::Union->value
-                ? $info?->listMemberUnionInfo ?? $itemSchema
+                ? $info->listMemberUnionInfo ?? $itemSchema
                 : $itemSchema);
         // Skip the renderValue() dispatch for the common string case.
         $isString = $type === ShapeType::String_->value;
@@ -568,7 +568,7 @@ final class JsonSerializer implements ShapeSerializerInterface
         $valueSchema = $memberSchema->mapValue;
         /** @var JsonSchemaExtension|null $info */
         $info = $memberSchema->getExtension($extKey);
-        $sparse = $info?->sparse ?? false;
+        $sparse = $info->sparse ?? false;
         $out = [];
 
         if ($valueSchema === null) {
@@ -576,11 +576,11 @@ final class JsonSerializer implements ShapeSerializerInterface
             return $entries === [] ? new \stdClass() : $entries;
         }
 
-        $type = $info?->mapValueType ?? $valueSchema->type;
+        $type = $info->mapValueType ?? $valueSchema->type;
         $context = $type === ShapeType::Timestamp->value
             ? $info?->mapValueTimestampFormat
             : ($type === ShapeType::Union->value
-                ? $info?->mapValueUnionInfo ?? $valueSchema
+                ? $info->mapValueUnionInfo ?? $valueSchema
                 : $valueSchema);
         // Skip the renderValue() dispatch for the common string case.
         $isString = $type === ShapeType::String_->value;

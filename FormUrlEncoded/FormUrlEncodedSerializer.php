@@ -277,22 +277,22 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             $itemPrefix = $this->prefix . $precomputedItemPrefix;
         } else {
             $flattened = $this->settings->alwaysFlattenLists
-                || ($info?->flattened ?? false);
+                || ($info->flattened ?? false);
             if ($flattened) {
                 $itemPrefix = $this->prefix . $containerName . '.';
             } else {
                 $memberName = $this->honorXmlName
-                    ? $info?->listMemberName ?? 'member'
+                    ? $info->listMemberName ?? 'member'
                     : 'member';
                 $itemPrefix = $this->prefix . $containerName . '.'
                     . $memberName . '.';
             }
         }
 
-        $memberSchema = $info?->listMemberSchema ?? $schema->getListMember();
+        $memberSchema = $info->listMemberSchema ?? $schema->getListMember();
         // Resolve member type as its int discriminant once per call.
-        $mt = $info?->listMemberType
-            ?? $memberSchema?->type
+        $mt = $info->listMemberType
+            ?? $memberSchema->type
             ?? ShapeType::Document->value;
 
         switch ($mt) {
@@ -408,11 +408,11 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $info = $schema->getExtension($extKey);
 
         $containerName = $this->wireNames[$idx] ?? '';
-        $flattened = $info?->flattened ?? false;
-        $keyName = $info?->mapKeyName ?? 'key';
-        $valueName = $info?->mapValueName ?? 'value';
-        $keyAssignment = $info?->mapKeyAssignment ?? ($keyName . '=');
-        $valueAssignment = $info?->mapValueAssignment
+        $flattened = $info->flattened ?? false;
+        $keyName = $info->mapKeyName ?? 'key';
+        $valueName = $info->mapValueName ?? 'value';
+        $keyAssignment = $info->mapKeyAssignment ?? ($keyName . '=');
+        $valueAssignment = $info->mapValueAssignment
             ?? ($valueName . '=');
 
         $precomputedEntryPrefix = $info?->memberMapEntryPrefix;
@@ -424,9 +424,9 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                 : $this->prefix . $containerName . '.entry.';
         }
 
-        $valueSchema = $info?->mapValueSchema ?? $schema->getMapValue();
-        $valueType = $info?->mapValueType
-            ?? $valueSchema?->type
+        $valueSchema = $info->mapValueSchema ?? $schema->getMapValue();
+        $valueType = $info->mapValueType
+            ?? $valueSchema->type
             ?? ShapeType::String_->value;
 
         switch ($valueType) {
@@ -537,7 +537,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         $this->prefix = '';
         $this->wireNames =
             $info?->memberWireNamesByMode[$this->wireNameMode] ?? [];
-        $this->tsFormats = $info?->tsFormats ?? [];
+        $this->tsFormats = $info->tsFormats ?? [];
     }
 
     /**
@@ -563,7 +563,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
 
         $this->wireNames =
             $info?->memberWireNamesByMode[$this->wireNameMode] ?? [];
-        $this->tsFormats = $info?->tsFormats ?? [];
+        $this->tsFormats = $info->tsFormats ?? [];
     }
 
     /**

@@ -1113,15 +1113,15 @@ final class CborSerializer implements ShapeSerializerInterface
             $info = $schema->getExtension($extKey);
         }
 
-        $memberSchema = $info?->listMemberSchema ?? $schema->listMember;
-        $sparse = $info?->sparse ?? false;
+        $memberSchema = $info->listMemberSchema ?? $schema->listMember;
+        $sparse = $info->sparse ?? false;
         $this->writeArrayStart($this->countListItems($list, $sparse));
         if ($memberSchema === null) {
 
             return;
         }
 
-        $memberType = $info?->listMemberType ?? $memberSchema->type;
+        $memberType = $info->listMemberType ?? $memberSchema->type;
         switch ($memberType) {
             case ShapeType::Union->value:
                 $unionInfo = $info?->listMemberUnionInfo;
@@ -1344,15 +1344,15 @@ final class CborSerializer implements ShapeSerializerInterface
             $info = $schema->getExtension($extKey);
         }
 
-        $valueSchema = $info?->mapValueSchema ?? $schema->mapValue;
-        $sparse = $info?->sparse ?? false;
+        $valueSchema = $info->mapValueSchema ?? $schema->mapValue;
+        $sparse = $info->sparse ?? false;
         $this->writeMapStart($this->countMapEntries($map, $sparse));
         if ($valueSchema === null) {
 
             return;
         }
 
-        $valueType = $info?->mapValueType ?? $valueSchema->type;
+        $valueType = $info->mapValueType ?? $valueSchema->type;
         switch ($valueType) {
             case ShapeType::Union->value:
                 $unionInfo = $info?->mapValueUnionInfo;
@@ -1680,11 +1680,11 @@ final class CborSerializer implements ShapeSerializerInterface
         if ($entry === null) {
             $tag = (string) $tag;
             $resolvedSchema = $unionSchema
-                ?? $info?->resolvedTargetSchema
+                ?? $info->resolvedTargetSchema
                 ?? $this->resolveTargetSchema($schema);
             $entry = $info?->unionEncodeByMemberName[$tag] ?? null;
-            $variantSchema = $entry[2] ?? $resolvedSchema?->getMember($tag);
-            if ($resolvedSchema !== null && $variantSchema === null) {
+            $variantSchema = $entry[2] ?? $resolvedSchema->getMember($tag);
+            if ($variantSchema === null) {
                 throw new SerializationException(
                     'Unknown union variant: ' . $tag
                 );
@@ -1781,66 +1781,8 @@ final class CborSerializer implements ShapeSerializerInterface
         }
 
         $this->writeMapStart(1);
-        if ($variantSchema !== null) {
-            $this->buffer .= $this->resolveMemberNameBytes($variantSchema);
-            $this->writeValue($variantSchema, $value);
-
-            return;
-        }
-
-        $length = \strlen($tag);
-        if ($length < 24) {
-            $this->buffer .= \chr(0x60 | $length) . $tag;
-        } else {
-            switch (true) {
-                case $length <= 0xFF:
-                    $this->buffer .= "\x78" . \chr($length) . $tag;
-                    break;
-
-                case $length <= 0xFFFF:
-                    $this->buffer .= "\x79" . \pack('n', $length) . $tag;
-                    break;
-
-                case $length <= 0xFFFF_FFFF:
-                    $this->buffer .= "\x7A" . \pack('N', $length) . $tag;
-                    break;
-
-                default:
-                    $high = ($length >> 32) & 0xFFFF_FFFF;
-                    $low = $length & 0xFFFF_FFFF;
-                    $this->buffer .= "\x7B" . \pack('NN', $high, $low) . $tag;
-                    break;
-            }
-        }
-
-        $value = (string) $value;
-        $length = \strlen($value);
-        if ($length < 24) {
-            $this->buffer .= \chr(0x60 | $length) . $value;
-
-            return;
-        }
-
-        switch (true) {
-            case $length <= 0xFF:
-                $this->buffer .= "\x78" . \chr($length) . $value;
-
-                return;
-
-            case $length <= 0xFFFF:
-                $this->buffer .= "\x79" . \pack('n', $length) . $value;
-
-                return;
-
-            case $length <= 0xFFFF_FFFF:
-                $this->buffer .= "\x7A" . \pack('N', $length) . $value;
-
-                return;
-        }
-
-        $high = ($length >> 32) & 0xFFFF_FFFF;
-        $low = $length & 0xFFFF_FFFF;
-        $this->buffer .= "\x7B" . \pack('NN', $high, $low) . $value;
+        $this->buffer .= $this->resolveMemberNameBytes($variantSchema);
+        $this->writeValue($variantSchema, $value);
     }
 
     /**
@@ -2067,13 +2009,13 @@ final class CborSerializer implements ShapeSerializerInterface
     /**
      * Resolve the target schema for a structure or union member.
      */
-    private function resolveTargetSchema(Schema $schema): ?Schema
+    private function resolveTargetSchema(Schema $schema): Schema
     {
         static $extKey = null;
         $extKey ??= CborSchemaExtensionProvider::key();
         /** @var CborSchemaExtension|null $info */
         $info = $schema->getExtension($extKey);
-        return $info?->resolvedTargetSchema ?? $schema;
+        return $info->resolvedTargetSchema ?? $schema;
     }
 
     /**
@@ -2085,7 +2027,7 @@ final class CborSerializer implements ShapeSerializerInterface
         $extKey ??= CborSchemaExtensionProvider::key();
         /** @var CborSchemaExtension|null $info */
         $info = $schema->getExtension($extKey);
-        return $info?->memberNameBytes
+        return $info->memberNameBytes
             ?? CborSchemaExtensionProvider::encodeMemberName(
                 (string) $schema->memberName
             );

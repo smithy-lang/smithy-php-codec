@@ -56,7 +56,7 @@ final class JsonCodec extends AbstractCodec
         $key ??= JsonSchemaExtensionProvider::$KEY
             ?? JsonSchemaExtensionProvider::key();
 
-        return $schema->getExtension($key)?->membersTemplate
+        return $schema->getExtension($key)->membersTemplate
             ?? parent::createMembersBuffer($schema);
     }
 

@@ -27,13 +27,20 @@ final class XmlCodec extends AbstractCodec
 {
     /**
      * Idle XML writers available for reuse.
+     *
+     * @var list<\XMLWriter>
      */
     private array $writerPool = [];
     private readonly XmlCodecSettings $settings;
+    /** @var \Closure(\XMLWriter): void */
+    private readonly \Closure $releaseWriter;
 
     public function __construct(?XmlCodecSettings $settings = null)
     {
         $this->settings = $settings ?? new XmlCodecSettings();
+        $this->releaseWriter = function (\XMLWriter $writer): void {
+            $this->writerPool[] = $writer;
+        };
     }
 
     /**
@@ -47,7 +54,7 @@ final class XmlCodec extends AbstractCodec
         return new XmlSerializer(
             $writer,
             $this->settings,
-            $this->writerPool
+            $this->releaseWriter
         );
     }
 
@@ -113,7 +120,7 @@ final class XmlCodec extends AbstractCodec
         $key ??= XmlSchemaExtensionProvider::$KEY
             ?? XmlSchemaExtensionProvider::key();
 
-        return $schema->getExtension($key)?->membersTemplate
+        return $schema->getExtension($key)->membersTemplate
             ?? parent::createMembersBuffer($schema);
     }
 }

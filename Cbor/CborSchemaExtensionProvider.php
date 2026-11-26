@@ -161,7 +161,7 @@ final class CborSchemaExtensionProvider
             return new CborSchemaExtension(
                 memberNameBytes: $memberNameBytes,
                 resolvedTargetClass: $schema->targetClass
-                    ?? $schema->resolveTarget()?->targetClass
+                    ?? $schema->resolveTarget()->targetClass
             );
         }
 

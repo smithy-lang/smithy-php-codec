@@ -74,7 +74,7 @@ final class XmlSchemaExtensionProvider
             ? $schema->resolveTarget()
             : $schema;
         $resolvedTargetClass = $schema->targetClass
-            ?? $resolvedTarget?->targetClass;
+            ?? $resolvedTarget->targetClass;
         $resolvedTargetSchema = $resolvedTarget;
 
         $explicitXmlName = self::getXmlNameTrait($schema);

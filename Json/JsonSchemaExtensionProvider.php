@@ -225,7 +225,7 @@ final class JsonSchemaExtensionProvider
                 && $inner->getMemberCount() === 0
             ) {
                 $listMemberResolvedTargetClass =
-                    $inner->resolveTarget()?->targetClass;
+                    $inner->resolveTarget()->targetClass;
             }
         }
         if ($inner !== null && $innerType === ShapeType::Union->value) {
@@ -278,7 +278,7 @@ final class JsonSchemaExtensionProvider
                 && $value->getMemberCount() === 0
             ) {
                 $mapValueResolvedTargetClass =
-                    $value->resolveTarget()?->targetClass;
+                    $value->resolveTarget()->targetClass;
             }
         }
         if ($value !== null && $valueType === ShapeType::Union->value) {
@@ -342,7 +342,7 @@ final class JsonSchemaExtensionProvider
             timestampFormats: [],
             hasBigNumber: false,
             resolvedTargetClass: $schema->targetClass
-                ?? $schema->resolveTarget()?->targetClass
+                ?? $schema->resolveTarget()->targetClass
         );
     }
 

@@ -868,7 +868,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
                 $targetSchema = $resolvedTargetSchema ?? $schema;
                 /** @var CborSchemaExtension|null $targetInfo */
                 $targetInfo = $targetSchema->getExtension($structExtKey);
-                $nestedMembers = $targetInfo?->membersTemplate ?? [];
+                $nestedMembers = $targetInfo->membersTemplate ?? [];
                 $this->readStruct($targetSchema, $nestedMembers);
                 if ($resolvedTargetClass !== null) {
                     return $resolvedTargetClass::fromMembers($nestedMembers);
@@ -917,7 +917,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
         $extKey ??= CborSchemaExtensionProvider::key();
         /** @var CborSchemaExtension|null $info */
         $info = $schema->getExtension($extKey);
-        $itemSchema = $info?->listMemberSchema ?? $schema->listMember;
+        $itemSchema = $info->listMemberSchema ?? $schema->listMember;
         if (!$itemSchema) {
             $this->skipValue();
             return [];
@@ -939,13 +939,13 @@ final class CborDeserializer implements ShapeDeserializerInterface
             return $out;
         }
 
-        $itemType = $info?->listMemberType ?? 0;
+        $itemType = $info->listMemberType ?? 0;
         $resolvedTargetClass = $info?->listMemberResolvedTargetClass;
         $resolvedTargetSchema = $info?->listMemberResolvedTargetSchema;
         $unionInfo = $info?->listMemberUnionInfo;
         $payload = $this->payload;
         $payloadLength = $this->length;
-        $sparse = $info?->sparse ?? false;
+        $sparse = $info->sparse ?? false;
 
         while (true) {
             if ($indefinite) {
@@ -1002,7 +1002,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
         $extKey ??= CborSchemaExtensionProvider::key();
         /** @var CborSchemaExtension|null $info */
         $info = $schema->getExtension($extKey);
-        $valueSchema = $info?->mapValueSchema ?? $schema->mapValue;
+        $valueSchema = $info->mapValueSchema ?? $schema->mapValue;
         if (!$valueSchema) {
             $this->skipValue();
             return [];
@@ -1024,13 +1024,13 @@ final class CborDeserializer implements ShapeDeserializerInterface
             return $out;
         }
 
-        $valueType = $info?->mapValueType ?? 0;
+        $valueType = $info->mapValueType ?? 0;
         $resolvedTargetClass = $info?->mapValueResolvedTargetClass;
         $resolvedTargetSchema = $info?->mapValueResolvedTargetSchema;
         $unionInfo = $info?->mapValueUnionInfo;
         $payload = $this->payload;
         $payloadLength = $this->length;
-        $sparse = $info?->sparse ?? false;
+        $sparse = $info->sparse ?? false;
 
         while (true) {
             if ($indefinite) {
