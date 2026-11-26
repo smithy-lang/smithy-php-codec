@@ -21,6 +21,10 @@ use Smithy\Core\Serde\TimestampFormat;
  *
  * @internal Codec-specific metadata attached to XML schemas. External code
  *           should not rely on this field layout.
+ *
+ * @phpstan-type XmlChildMember array{0: 0, 1: int, 2: Schema, 3: int, 4?: TimestampFormat}
+ *     |array{0: 2, 1: int, 2: Schema, 3: ?Schema}
+ *     |array{0: 3, 1: int, 2: Schema, 3: string, 4: string, 5: ?Schema}
  */
 final class XmlSchemaExtension
 {
@@ -58,7 +62,7 @@ final class XmlSchemaExtension
          */
         public readonly array $flattenedMaps = [],
         /**
-         * @var array<string, array>
+         * @var array<string, XmlChildMember>
          *     xmlName -> [kind, memberIndex, memberSchema, ...payload]
          *     kind 0 => [0, memberIndex, memberSchema, shapeType,
          *     ?TimestampFormat]
@@ -68,7 +72,7 @@ final class XmlSchemaExtension
          */
         public readonly array $childMembers = [],
         /**
-         * @var list<array{0: string, 1: array}>
+         * @var list<array{0: string, 1: XmlChildMember}>
          */
         public readonly array $orderedChildMembers = [],
         /** Cached count of `orderedChildMembers`. */
