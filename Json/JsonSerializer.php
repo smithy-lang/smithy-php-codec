@@ -280,7 +280,10 @@ final class JsonSerializer implements ShapeSerializerInterface
         $finishedFrame = $this->current;
 
         [$parentFrame, $parentWireNames, $parentTimestampFormats, $idx]
-            = \array_pop($this->frameStack);
+            = \array_pop($this->frameStack)
+                ?? throw new SerializationException(
+                    'endStruct() was called without a matching beginStruct().'
+                );
 
         // Drop the old reference before rebinding `$current`.
         unset($this->current);
@@ -447,7 +450,9 @@ final class JsonSerializer implements ShapeSerializerInterface
         $value->serializeMembers($this);
 
         // Read from `$this->current` in case nested imperative writes rebound it.
-        $result = $this->current;
+        $result = $this->current ?? throw new SerializationException(
+            'A nested endStruct() closed the frame of an inline structure.'
+        );
 
         unset($this->current);
         $this->current = &$prevCurrent;

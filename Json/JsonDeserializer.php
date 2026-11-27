@@ -243,7 +243,11 @@ final class JsonDeserializer implements ShapeDeserializerInterface
         array $value
     ): ?SerializableShapeInterface
     {
-        $unionSchema = $info->resolvedTargetSchema;
+        // The provider always sets the target schema for unions.
+        $unionSchema = $info->resolvedTargetSchema
+            ?? throw new \LogicException(
+                'Union extension has no resolved target schema.'
+            );
         $targetClass = $info->resolvedTargetClass;
         $unionDecodeByWireName = $this->settings->honorJsonName
             ? $info->unionDecodeByWireName

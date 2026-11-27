@@ -216,8 +216,12 @@ final class XmlSchemaExtensionProvider
         $unionMembersByIndex = [];
 
         foreach ($schema->getMembersByIndex() as $idx => $memberSchema) {
-            $xmlName = self::getXmlNameTrait($memberSchema)
-                ?? $memberSchema->memberName;
+            // Schema rejects members without a name, so this always holds.
+            $memberName = $memberSchema->memberName
+                ?? throw new \LogicException(
+                    "Member schema {$memberSchema->id} has no member name."
+                );
+            $xmlName = self::getXmlNameTrait($memberSchema) ?? $memberName;
             $memberWireNames[$idx] = $xmlName;
 
             $memberComponentTypes[$idx] = XmlSchemaExtension::COMPONENT_ELEMENT;
@@ -282,7 +286,7 @@ final class XmlSchemaExtensionProvider
                 && $memberSchema->hasTrait(Schema::T_XML_FLATTENED)
             ) {
                 $flatName = self::getXmlNameTrait($memberSchema)
-                    ?? $memberSchema->memberName;
+                    ?? $memberName;
                 $listMember = $memberSchema->getListMember();
                 $elementMembers[$flatName] = $memberSchema;
                 $flattenedLists[$flatName] = [
@@ -291,7 +295,7 @@ final class XmlSchemaExtensionProvider
                 ];
                 $childMembers[$flatName] = [
                     2,
-                    $memberSchema->memberIndex,
+                    $idx,
                     $memberSchema,
                     $listMember
                 ];
@@ -299,7 +303,7 @@ final class XmlSchemaExtensionProvider
                 && $memberSchema->hasTrait(Schema::T_XML_FLATTENED)
             ) {
                 $flatName = self::getXmlNameTrait($memberSchema)
-                    ?? $memberSchema->memberName;
+                    ?? $memberName;
                 $mapKey = $memberSchema->getMapKey();
                 $mapValue = $memberSchema->getMapValue();
                 $keyName = self::getXmlNameTrait($mapKey) ?? 'key';
@@ -314,7 +318,7 @@ final class XmlSchemaExtensionProvider
                 ];
                 $childMembers[$flatName] = [
                     3,
-                    $memberSchema->memberIndex,
+                    $idx,
                     $memberSchema,
                     $keyName,
                     $valueName,
@@ -346,7 +350,7 @@ final class XmlSchemaExtensionProvider
 
             if ($schema->type === ShapeType::Union->value) {
                 $unionMembersByXmlName[$xmlName] = [$idx, $memberSchema];
-                $unionMembersByName[$memberSchema->memberName] = $memberSchema;
+                $unionMembersByName[$memberName] = $memberSchema;
                 $unionMembersByIndex[$idx] = $memberSchema;
             }
         }

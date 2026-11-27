@@ -105,10 +105,20 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     // a struct with N scalar members is N x (1 array read, 1 C-string
     // encode, 1 string concat).
     //
-    // `$this->wireNames` is guaranteed non-null here because scalar
-    // methods only run inside a beginStruct to endStruct pair emitted
-    // by codegen. The `null` state is reserved for the outermost
-    // "before any struct opens" case, which no scalar path reaches.
+    // Scalar methods run inside a beginStruct to endStruct pair emitted
+    // by codegen, so the current frame has a wire name for `$idx`. A
+    // write outside a frame, or for an unknown index, throws.
+
+    /**
+     * Build the error for a member write with no wire name in the current frame.
+     */
+    private static function missingWireName(int $idx): SerializationException
+    {
+        return new SerializationException(
+            "No form-urlencoded wire name for member index {$idx}; "
+            . 'scalar members are written inside a structure.'
+        );
+    }
 
     /**
      * Serialize a boolean member.
@@ -122,7 +132,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     ): void
     {
         $this->buffer .= $this->prefix
-            . $this->wireNames[$idx]
+            . ($this->wireNames[$idx] ?? throw self::missingWireName($idx))
             . '='
             . ($value ? 'true' : 'false')
             . '&';
@@ -136,7 +146,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     public function serializeInteger(Schema $schema, int $value, int $idx): void
     {
         $this->buffer .= $this->prefix
-            . $this->wireNames[$idx]
+            . ($this->wireNames[$idx] ?? throw self::missingWireName($idx))
             . '='
             . (string) $value
             . '&';
@@ -157,7 +167,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             default => $str
         };
         $this->buffer .= $this->prefix
-            . $this->wireNames[$idx]
+            . ($this->wireNames[$idx] ?? throw self::missingWireName($idx))
             . '='
             . \rawurlencode($s)
             . '&';
@@ -175,7 +185,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     ): void
     {
         $this->buffer .= $this->prefix
-            . $this->wireNames[$idx]
+            . ($this->wireNames[$idx] ?? throw self::missingWireName($idx))
             . '='
             . \rawurlencode($value->value)
             . '&';
@@ -193,7 +203,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     ): void
     {
         $this->buffer .= $this->prefix
-            . $this->wireNames[$idx]
+            . ($this->wireNames[$idx] ?? throw self::missingWireName($idx))
             . '='
             . \rawurlencode($value->value)
             . '&';
@@ -211,7 +221,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     ): void
     {
         $this->buffer .= $this->prefix
-            . $this->wireNames[$idx]
+            . ($this->wireNames[$idx] ?? throw self::missingWireName($idx))
             . '='
             . \rawurlencode($value)
             . '&';
@@ -232,7 +242,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     {
         $value = (string) $value;
         $this->buffer .= $this->prefix
-            . $this->wireNames[$idx]
+            . ($this->wireNames[$idx] ?? throw self::missingWireName($idx))
             . '='
             . \rawurlencode(\base64_encode($value))
             . '&';
@@ -250,7 +260,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
             : null
         ) ?? $this->settings->defaultTimestampFormat;
         $this->buffer .= $this->prefix
-            . $this->wireNames[$idx]
+            . ($this->wireNames[$idx] ?? throw self::missingWireName($idx))
             . '='
             . \rawurlencode($fmt->format($value))
             . '&';
@@ -332,6 +342,12 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                 );
 
                 return;
+        }
+
+        if ($memberSchema === null) {
+            throw new SerializationException(
+                "List schema {$schema->id} has no member schema."
+            );
         }
 
         $savedPrefix = $this->prefix;
@@ -468,6 +484,12 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                 );
 
                 return;
+        }
+
+        if ($valueSchema === null) {
+            throw new SerializationException(
+                "Map schema {$schema->id} has no value schema."
+            );
         }
 
         $savedPrefix = $this->prefix;
@@ -809,12 +831,14 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                 return;
 
             case ShapeType::Timestamp->value:
+                $format = $timestampFormat
+                    ?? $this->settings->defaultTimestampFormat;
                 $counter = 1;
                 foreach ($list as $item) {
                     if ($item !== null) {
                         $this->buffer .= $itemPrefix . $counter . '='
                             . \rawurlencode(
-                                $timestampFormat->format((float) $item)
+                                $format->format((float) $item)
                             )
                             . '&';
                     }
@@ -940,6 +964,8 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                 return;
 
             case ShapeType::Timestamp->value:
+                $format = $timestampFormat
+                    ?? $this->settings->defaultTimestampFormat;
                 $counter = 1;
                 foreach ($map as $key => $value) {
                     $prefix = $entryPrefix . $counter . '.';
@@ -948,7 +974,7 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                     if ($value !== null) {
                         $this->buffer .= $prefix . $valueAssignment
                             . \rawurlencode(
-                                $timestampFormat->format((float) $value)
+                                $format->format((float) $value)
                             )
                             . '&';
                     }
@@ -1091,9 +1117,9 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
                 ? (($info?->capitalizedResolvedUnionMemberWireNames[
                     $tag
                 ] ?? null)
-                    ?? $variantSchema->memberName)
+                    ?? $tag)
                 : (($info?->resolvedUnionMemberWireNames[$tag] ?? null)
-                    ?? $variantSchema->memberName);
+                    ?? $tag);
         }
 
         $name = (string) $variantSchema->memberName;

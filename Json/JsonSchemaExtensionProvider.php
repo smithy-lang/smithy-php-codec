@@ -82,7 +82,11 @@ final class JsonSchemaExtensionProvider
             : $schema;
 
         foreach ($metadataSchema->getMembersByIndex() as $idx => $member) {
-            $memberName = $member->memberName;
+            // Schema rejects members without a name, so this always holds.
+            $memberName = $member->memberName
+                ?? throw new \LogicException(
+                    "Member schema {$member->id} has no member name."
+                );
             $wireName = $member->getTrait(Schema::T_JSON_NAME) ?? $memberName;
 
             $byIndex[$idx] = $wireName;

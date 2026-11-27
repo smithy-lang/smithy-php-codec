@@ -267,8 +267,10 @@ final class XmlSerializer implements ShapeSerializerInterface
         $info = $schema->getExtension($extKey);
         $listMember = $info->listMemberSchema;
 
-        $xmlName = $info->xmlName ?: $schema->memberName;
-        $itemName = $info->flattened ? $xmlName : $info->listMemberName;
+        $xmlName = self::elementName($schema, $info);
+        $itemName = $info->flattened
+            ? $xmlName
+            : $info->listMemberName ?? 'member';
 
         if (!$info->flattened) {
             $this->writer->startElement($xmlName);
@@ -319,7 +321,13 @@ final class XmlSerializer implements ShapeSerializerInterface
                 $this->writeBlobItems($list, $itemName, $nsUri, $nsPrefix);
                 break;
             case ShapeType::Structure->value:
-                $this->writeStructItems($list, $itemName, $listMember);
+                $this->writeStructItems(
+                    $list,
+                    $itemName,
+                    $listMember ?? throw new SerializationException(
+                        "List schema {$schema->id} has no member schema."
+                    )
+                );
                 break;
             case ShapeType::List_->value:
                 if ($listMember !== null) {
@@ -373,12 +381,12 @@ final class XmlSerializer implements ShapeSerializerInterface
         $mapKey = $schema->getMapKey();
         $mapValue = $schema->getMapValue();
 
-        $keyName = $info->mapKeyName;
-        $valueName = $info->mapValueName;
-        $entryName = $info->mapEntryName;
+        $keyName = $info->mapKeyName ?? 'key';
+        $valueName = $info->mapValueName ?? 'value';
+        $entryName = $info->mapEntryName ?? 'entry';
 
         if (!$info->flattened) {
-            $this->writer->startElement($info->xmlName ?: $schema->memberName);
+            $this->writer->startElement(self::elementName($schema, $info));
             $this->applyXmlNamespace($info);
         }
 
@@ -1114,13 +1122,31 @@ final class XmlSerializer implements ShapeSerializerInterface
         }
     }
     /**
+     * Return the XML element name for a list or map: its `@xmlName`, else its member name.
+     *
+     * @throws SerializationException When the schema has neither name.
+     */
+    private static function elementName(
+        Schema $schema,
+        XmlSchemaExtension $info
+    ): string
+    {
+        return ($info->xmlName ?: $schema->memberName)
+            ?? throw new SerializationException(
+                "Schema {$schema->id} has no XML element name."
+            );
+    }
+
+    /**
      * Serialize a member value by shape type.
      *
      * @return void
      */
     private function writeMemberValue(Schema $memberSchema, mixed $value): void
     {
-        $idx = $memberSchema->memberIndex;
+        $idx = $memberSchema->memberIndex ?? throw new SerializationException(
+            "Schema {$memberSchema->id} is not a member schema."
+        );
         switch ($memberSchema->type) {
             case ShapeType::Structure->value:
                 $this->serializeStruct($memberSchema, $value, $idx);

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Xml;
 
+use Smithy\Codec\Exception\DeserializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableShapeInterface;
 use Smithy\Core\Shape\ShapeType;
@@ -293,6 +294,18 @@ final class XmlDeserializer implements ShapeDeserializerInterface
     }
 
     /**
+     * Build the error for a structure or union list without a member schema.
+     */
+    private static function missingListMember(
+        Schema $schema
+    ): DeserializationException
+    {
+        return new DeserializationException(
+            "List schema {$schema->id} has no member schema."
+        );
+    }
+
+    /**
      * Read a list value from an element.
      *
      * @return list<mixed>
@@ -322,7 +335,7 @@ final class XmlDeserializer implements ShapeDeserializerInterface
                 }
                 break;
             case ShapeType::Enum->value:
-                $class = $listMember->targetClass;
+                $class = $listMember?->targetClass;
                 foreach ($element->{$memberName} as $child) {
                     $value = (string) $child;
                     $result[] = $class !== null
@@ -339,7 +352,7 @@ final class XmlDeserializer implements ShapeDeserializerInterface
                 }
                 break;
             case ShapeType::IntEnum->value:
-                $class = $listMember->targetClass;
+                $class = $listMember?->targetClass;
                 foreach ($element->{$memberName} as $child) {
                     $value = (int) (string) $child;
                     $result[] = $class !== null
@@ -388,7 +401,7 @@ final class XmlDeserializer implements ShapeDeserializerInterface
                 foreach ($element->{$memberName} as $child) {
                     $result[] = $this->readNestedStructFromElement(
                         $child,
-                        $listMember,
+                        $listMember ?? throw self::missingListMember($schema),
                         $memberInfo
                     );
                 }
@@ -398,7 +411,7 @@ final class XmlDeserializer implements ShapeDeserializerInterface
                 foreach ($element->{$memberName} as $child) {
                     $result[] = $this->readUnionFromElement(
                         $child,
-                        $listMember,
+                        $listMember ?? throw self::missingListMember($schema),
                         $memberInfo
                     );
                 }
