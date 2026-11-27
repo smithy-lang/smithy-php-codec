@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Json;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableStructInterface;
@@ -168,10 +169,17 @@ final class JsonSerializer implements ShapeSerializerInterface
     /**
      * Serialize a blob member into the current JSON frame.
      *
+     * Streams are read in full with `(string)`, which rewinds seekable streams.
+     *
      * @return void
      */
-    public function serializeBlob(Schema $schema, string $value, int $idx): void
+    public function serializeBlob(
+        Schema $schema,
+        string|StreamInterface $value,
+        int $idx
+    ): void
     {
+        $value = (string) $value;
         // JSON blobs are base64-encoded strings.
         $this->emit(\base64_encode($value), $idx);
     }
@@ -545,8 +553,8 @@ final class JsonSerializer implements ShapeSerializerInterface
 
         $out = [];
         if ($itemSchema === null || $type === null) {
-            // Untyped lists pass through unchanged, nulls included.
-            return $items;
+            // Untyped lists pass through reindexed, nulls included.
+            return \array_values($items);
         }
 
         $context = $type === ShapeType::Timestamp->value
@@ -571,8 +579,11 @@ final class JsonSerializer implements ShapeSerializerInterface
     }
 
     /**
+     * Render map entries. A list-shaped result (empty, or keys "0", "1", ...
+     * that PHP stores as ints) is cast to an object so it encodes as `{}`.
+     *
      * @param array<mixed> $entries
-     * @return array<string, mixed>|\stdClass
+     * @return array<array-key, mixed>|\stdClass
      */
     private function renderMapInline(Schema $memberSchema, array $entries): array|\stdClass
     {
@@ -587,7 +598,7 @@ final class JsonSerializer implements ShapeSerializerInterface
 
         if ($valueSchema === null) {
             // Untyped maps pass through unchanged, nulls included.
-            return $entries === [] ? new \stdClass() : $entries;
+            return \array_is_list($entries) ? (object) $entries : $entries;
         }
 
         $type = $info->mapValueType ?? $valueSchema->type;
@@ -609,7 +620,7 @@ final class JsonSerializer implements ShapeSerializerInterface
                 ? (string) $value
                 : $this->renderValue($type, $value, $context);
         }
-        return $out === [] ? new \stdClass() : $out;
+        return \array_is_list($out) ? (object) $out : $out;
     }
 
     private function renderTimestamp(Schema $memberSchema, mixed $value): mixed

@@ -209,12 +209,12 @@ final class CborSchemaExtensionProvider
             \ksort($membersByIndex);
         }
 
-        foreach ($membersByIndex as $member) {
+        foreach ($membersByIndex as $idx => $member) {
             $rawNameBytes = (string) $member->memberName;
             $encodedNameBytes = self::encodeMemberName($rawNameBytes);
-            $fieldNameTable[$member->memberIndex] = $encodedNameBytes;
+            $fieldNameTable[$idx] = $encodedNameBytes;
             $orderedMemberSchemas[] = $member;
-            $orderedMemberIndexes[] = $member->memberIndex ?? 0;
+            $orderedMemberIndexes[] = $idx;
             $orderedMemberTypes[] = $member->type;
             $orderedMemberNameBytes[] = $rawNameBytes;
             $nameLength = \strlen($rawNameBytes);

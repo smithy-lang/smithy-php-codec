@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Xml;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Shape\ShapeType;
@@ -206,10 +207,17 @@ final class XmlSerializer implements ShapeSerializerInterface
     /**
      * Serialize a blob member.
      *
+     * Streams are read in full with `(string)`, which rewinds seekable streams.
+     *
      * @return void
      */
-    public function serializeBlob(Schema $schema, string $value, int $idx): void
+    public function serializeBlob(
+        Schema $schema,
+        string|StreamInterface $value,
+        int $idx
+    ): void
     {
+        $value = (string) $value;
         $encoded = \base64_encode($value);
         if ($this->memberComponentTypes[$idx]) {
             $this->writer->writeAttribute($this->wireNames[$idx], $encoded);

@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\Cbor;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableStructInterface;
@@ -421,10 +422,17 @@ final class CborSerializer implements ShapeSerializerInterface
     /**
      * Serialize a blob value.
      *
+     * Streams are read in full with `(string)`, which rewinds seekable streams.
+     *
      * @return void
      */
-    public function serializeBlob(Schema $schema, string $value, int $idx): void
+    public function serializeBlob(
+        Schema $schema,
+        string|StreamInterface $value,
+        int $idx
+    ): void
     {
+        $value = (string) $value;
         $table = $this->currentFieldNameTable;
         if ($table !== null) {
             $this->buffer .= $table[$idx]

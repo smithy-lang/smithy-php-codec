@@ -81,8 +81,7 @@ final class JsonSchemaExtensionProvider
             ? $schema->resolveTarget()
             : $schema;
 
-        foreach ($metadataSchema->getMembers() as $member) {
-            $idx = $member->memberIndex;
+        foreach ($metadataSchema->getMembersByIndex() as $idx => $member) {
             $memberName = $member->memberName;
             $wireName = $member->getTrait(Schema::T_JSON_NAME) ?? $memberName;
 

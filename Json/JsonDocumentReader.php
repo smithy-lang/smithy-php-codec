@@ -47,7 +47,7 @@ final class JsonDocumentReader
             $children[$key] = self::read($item, $settings);
         }
         if (\array_is_list($value)) {
-            return new ListDocument($children, null, $settings);
+            return new ListDocument(\array_values($children), null, $settings);
         }
 
         $type = $value['__type'] ?? null;

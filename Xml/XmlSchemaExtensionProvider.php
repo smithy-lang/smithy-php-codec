@@ -215,8 +215,7 @@ final class XmlSchemaExtensionProvider
         $unionMembersByName = [];
         $unionMembersByIndex = [];
 
-        foreach ($schema->getMembers() as $memberSchema) {
-            $idx = $memberSchema->memberIndex;
+        foreach ($schema->getMembersByIndex() as $idx => $memberSchema) {
             $xmlName = self::getXmlNameTrait($memberSchema)
                 ?? $memberSchema->memberName;
             $memberWireNames[$idx] = $xmlName;
@@ -509,23 +508,28 @@ final class XmlSchemaExtensionProvider
     /**
      * Normalize `@xmlNamespace` into `['uri' => ..., 'prefix' => ...]`.
      *
+     * A value without a string `uri` gives null; a non-string `prefix` is dropped.
+     *
      * @return array{uri: string, prefix?: string}|null
      */
     private static function resolveNamespace(mixed $nsTrait): ?array
     {
-        if ($nsTrait === null) {
+        if (\is_string($nsTrait)) {
+            if (!\str_starts_with($nsTrait, '{')) {
+                return ['uri' => $nsTrait];
+            }
+            $nsTrait = \json_decode($nsTrait, true);
+        }
+        if (!\is_array($nsTrait) || !\is_string($nsTrait['uri'] ?? null)) {
             return null;
         }
-        if (\is_array($nsTrait)) {
-            return $nsTrait;
-        }
-        if (\is_string($nsTrait)) {
-            return \str_starts_with($nsTrait, '{')
-                ? (\json_decode($nsTrait, true) ?: null)
-                : ['uri' => $nsTrait];
+
+        $namespace = ['uri' => $nsTrait['uri']];
+        if (\is_string($nsTrait['prefix'] ?? null)) {
+            $namespace['prefix'] = $nsTrait['prefix'];
         }
 
-        return null;
+        return $namespace;
     }
 
     /** Build XML metadata for a map schema. */

@@ -386,8 +386,8 @@ final class JsonDeserializer implements ShapeDeserializerInterface
         }
         $itemSchema = $member->listMember;
         if ($itemSchema === null) {
-            // Synthetic schemas without a member schema pass through.
-            return $value;
+            // Synthetic schemas without a member schema pass through as a list.
+            return \array_values($value);
         }
 
         static $extKey = null;

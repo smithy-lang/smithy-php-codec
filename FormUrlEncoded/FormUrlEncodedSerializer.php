@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Smithy\Codec\FormUrlEncoded;
 
+use Psr\Http\Message\StreamInterface;
 use Smithy\Codec\Exception\SerializationException;
 use Smithy\Core\Serde\Schema;
 use Smithy\Core\Serde\SerializableStructInterface;
@@ -219,10 +220,17 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
     /**
      * Serialize a blob member.
      *
+     * Streams are read in full with `(string)`, which rewinds seekable streams.
+     *
      * @return void
      */
-    public function serializeBlob(Schema $schema, string $value, int $idx): void
+    public function serializeBlob(
+        Schema $schema,
+        string|StreamInterface $value,
+        int $idx
+    ): void
     {
+        $value = (string) $value;
         $this->buffer .= $this->prefix
             . $this->wireNames[$idx]
             . '='
@@ -606,17 +614,15 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         } else {
             $tag = $union->tag();
             $variantSchema = $info?->unionMembersByName[$tag] ?? null;
-            $variantWire = $variantSchema === null
-                ? null
-                : $this->resolveUnionVariantWireName(
-                    $variantSchema,
-                    $info,
-                    $tag
-                );
+            if ($variantSchema === null) {
+                return;
+            }
+            $variantWire = $this->resolveUnionVariantWireName(
+                $variantSchema,
+                $info,
+                $tag
+            );
             $variantTsFmt = $info?->unionMemberTsFormats[$tag] ?? null;
-        }
-        if ($variantSchema === null) {
-            return;
         }
 
         $savedPrefix = $this->prefix;
@@ -625,7 +631,9 @@ final class FormUrlEncodedSerializer implements ShapeSerializerInterface
         }
         $savedWireNames = $this->wireNames;
         $savedTsFormats = $this->tsFormats;
-        $variantIdx = $variantSchema->memberIndex;
+        $variantIdx = $variantSchema->memberIndex ?? throw new SerializationException(
+            "Union variant schema {$variantSchema->id} is not a member schema."
+        );
         $this->wireNames = [$variantIdx => $variantWire];
         $this->tsFormats = [];
         if ($variantTsFmt !== null) {

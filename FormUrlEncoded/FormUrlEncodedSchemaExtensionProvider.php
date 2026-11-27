@@ -96,8 +96,7 @@ final class FormUrlEncodedSchemaExtensionProvider
         $unionEncodeByMemberIndex = [];
         $isUnion = $schema->type === ShapeType::Union->value;
 
-        foreach ($schema->getMembers() as $memberSchema) {
-            $idx = $memberSchema->memberIndex;
+        foreach ($schema->getMembersByIndex() as $idx => $memberSchema) {
 
             // Query key resolution: `@xmlName` on the member wins,
             // otherwise the Smithy member name. See the spec's "Query

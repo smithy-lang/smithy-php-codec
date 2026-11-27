@@ -1210,7 +1210,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
         $idx = $this->idx;
         $this->idx = $idx + 4;
 
-        return \unpack('G', $this->payload, $idx)[1];
+        return (\unpack('G', $this->payload, $idx) ?: $this->malformed())[1];
     }
 
     /**
@@ -1222,7 +1222,7 @@ final class CborDeserializer implements ShapeDeserializerInterface
         $idx = $this->idx;
         $this->idx = $idx + 8;
 
-        return \unpack('E', $this->payload, $idx)[1];
+        return (\unpack('E', $this->payload, $idx) ?: $this->malformed())[1];
     }
 
     /**
